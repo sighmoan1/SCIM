@@ -26,6 +26,10 @@ import {
   Shield,
   Menu,
   X,
+  ChevronUp,
+  ChevronDown,
+  Edit2,
+  Check,
 } from "lucide-react";
 
 interface Point {
@@ -50,10 +54,21 @@ interface Threat {
   impactRadius: number;
 }
 
+interface ImpactZone {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+  radius: number;
+  threatId?: string; // Optional reference to associated threat
+}
+
 interface Connection {
   id: string;
   from: string;
   to: string;
+  type?: string;
+  strength?: number;
 }
 
 interface Layer {
@@ -212,15 +227,21 @@ export default function AdvancedInfrastructureMapper() {
     useState<InfrastructureElement[]>(defaultElements);
   const [connections, setConnections] =
     useState<Connection[]>(defaultConnections);
+  const [impactZones, setImpactZones] = useState<ImpactZone[]>([]);
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
+  const [selectedImpactZone, setSelectedImpactZone] = useState<string | null>(
+    null
+  );
   const [connectingFrom, setConnectingFrom] = useState<string | null>(null);
   const [draggedElement, setDraggedElement] = useState<string | null>(null);
+  const [draggedImpactZone, setDraggedImpactZone] = useState<string | null>(
+    null
+  );
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({
     x: 0,
     y: 0,
   });
   const [showSegments, setShowSegments] = useState(true);
-  const [showThreatImpact, setShowThreatImpact] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("elements");
   const [svgDimensions, setSvgDimensions] = useState({
@@ -228,12 +249,25 @@ export default function AdvancedInfrastructureMapper() {
     height: 800,
   });
   const [resizingElement, setResizingElement] = useState<string | null>(null);
+  const [resizingImpactZone, setResizingImpactZone] = useState<string | null>(
+    null
+  );
   const [resizeHandle, setResizeHandle] = useState<string | null>(null);
 
   // Form states
   const [newElementName, setNewElementName] = useState("");
   const [newThreatName, setNewThreatName] = useState("");
   const [newLayerName, setNewLayerName] = useState("");
+  const [newImpactZoneName, setNewImpactZoneName] = useState("");
+  const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
+  const [editingLayerName, setEditingLayerName] = useState("");
+  const [editingElementId, setEditingElementId] = useState<string | null>(null);
+  const [editingElementName, setEditingElementName] = useState("");
+  const [editingImpactZoneId, setEditingImpactZoneId] = useState<string | null>(
+    null
+  );
+  const [editingImpactZoneName, setEditingImpactZoneName] = useState("");
+  const [draggedSegment, setDraggedSegment] = useState<string | null>(null);
 
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -441,10 +475,74 @@ export default function AdvancedInfrastructureMapper() {
     [resizingElement, resizeHandle, svgDimensions, scaledElements]
   );
 
+  const handleImpactZoneResize = useCallback(
+    (e: React.MouseEvent) => {
+      if (resizingImpactZone && resizeHandle && svgRef.current) {
+        const rect = svgRef.current.getBoundingClientRect();
+        const mouseX =
+          (e.clientX - rect.left) * (svgDimensions.width / rect.width);
+        const mouseY =
+          (e.clientY - rect.top) * (svgDimensions.height / rect.height);
+
+        setImpactZones((prev) =>
+          prev.map((zone) => {
+            if (zone.id === resizingImpactZone) {
+              // Calculate distance from center to mouse position
+              const dx = mouseX - zone.x;
+              const dy = mouseY - zone.y;
+              const newRadius = Math.max(20, Math.sqrt(dx * dx + dy * dy));
+
+              return { ...zone, radius: newRadius };
+            }
+            return zone;
+          })
+        );
+      }
+    },
+    [resizingImpactZone, resizeHandle, svgDimensions]
+  );
+
+  const handleSegmentMouseDown = (threatId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDraggedSegment(threatId);
+  };
+
+  const handleSegmentDrag = useCallback(
+    (e: React.MouseEvent) => {
+      if (draggedSegment && svgRef.current) {
+        const rect = svgRef.current.getBoundingClientRect();
+        const mouseX =
+          (e.clientX - rect.left) * (svgDimensions.width / rect.width);
+        const mouseY =
+          (e.clientY - rect.top) * (svgDimensions.height / rect.height);
+
+        // Calculate angle from center to mouse position
+        const dx = mouseX - centerX;
+        const dy = mouseY - centerY;
+        let angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+
+        // Normalize angle to 0-360 range
+        if (angle < 0) angle += 360;
+
+        // Update the threat's angle
+        setThreats((prev) =>
+          prev.map((threat) =>
+            threat.id === draggedSegment ? { ...threat, angle } : threat
+          )
+        );
+      }
+    },
+    [draggedSegment, svgDimensions, centerX, centerY]
+  );
+
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
       if (resizingElement) {
         handleResize(e);
+      } else if (resizingImpactZone) {
+        handleImpactZoneResize(e);
+      } else if (draggedSegment) {
+        handleSegmentDrag(e);
       } else if (draggedElement && svgRef.current) {
         const rect = svgRef.current.getBoundingClientRect();
 
@@ -476,24 +574,55 @@ export default function AdvancedInfrastructureMapper() {
               : el
           )
         );
+      } else if (draggedImpactZone && svgRef.current) {
+        const rect = svgRef.current.getBoundingClientRect();
+
+        // Get mouse position in SVG coordinate system (accounting for viewBox)
+        const mouseX =
+          (e.clientX - rect.left) * (svgDimensions.width / rect.width);
+        const mouseY =
+          (e.clientY - rect.top) * (svgDimensions.height / rect.height);
+
+        // Apply the offset to maintain the impact zone's position relative to where the user clicked
+        const x = mouseX - dragOffset.x;
+        const y = mouseY - dragOffset.y;
+
+        setImpactZones((prev) =>
+          prev.map((zone) =>
+            zone.id === draggedImpactZone
+              ? {
+                  ...zone,
+                  x,
+                  y,
+                }
+              : zone
+          )
+        );
       }
     },
     [
       draggedElement,
+      draggedImpactZone,
+      draggedSegment,
       resizingElement,
+      resizingImpactZone,
       svgDimensions,
       dragOffset,
       centerX,
       centerY,
       scaledElements,
       handleResize,
+      handleSegmentDrag,
     ]
   );
 
   const handleMouseUp = () => {
     setDraggedElement(null);
+    setDraggedImpactZone(null);
     setResizingElement(null);
+    setResizingImpactZone(null);
     setResizeHandle(null);
+    setDraggedSegment(null);
   };
 
   // Helper function to wrap text
@@ -567,23 +696,147 @@ export default function AdvancedInfrastructureMapper() {
     setNewThreatName("");
   };
 
+  // Recalculate all layer radii to eliminate gaps
+  const recalculateLayerRadii = (layerList: Layer[]) => {
+    const baseRadius = 60;
+    const radiusIncrement = 40;
+
+    return layerList.map((layer, index) => ({
+      ...layer,
+      radius: baseRadius + index * radiusIncrement,
+    }));
+  };
+
   const addLayer = () => {
     if (!newLayerName.trim()) return;
-
-    const maxCurrentRadius =
-      layers.length > 0 ? Math.max(...layers.map((l) => l.radius)) : 0;
-    const newRadius = maxCurrentRadius + 40;
 
     const newLayer: Layer = {
       id: Date.now().toString(),
       name: newLayerName,
-      radius: newRadius,
+      radius: 0, // Will be recalculated
       color: `hsl(${Math.random() * 360}, 50%, 70%)`,
       opacity: 0.4,
     };
 
-    setLayers((prev) => [...prev, newLayer]);
+    const updatedLayers = [...layers, newLayer];
+    const recalculatedLayers = recalculateLayerRadii(updatedLayers);
+    setLayers(recalculatedLayers);
     setNewLayerName("");
+  };
+
+  const moveLayer = (layerId: string, direction: "up" | "down") => {
+    const currentIndex = layers.findIndex((layer) => layer.id === layerId);
+    if (currentIndex === -1) return;
+
+    const newIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+    if (newIndex < 0 || newIndex >= layers.length) return;
+
+    const newLayers = [...layers];
+    [newLayers[currentIndex], newLayers[newIndex]] = [
+      newLayers[newIndex],
+      newLayers[currentIndex],
+    ];
+
+    const recalculatedLayers = recalculateLayerRadii(newLayers);
+    setLayers(recalculatedLayers);
+  };
+
+  const updateLayerName = (layerId: string, newName: string) => {
+    if (!newName.trim()) return;
+
+    setLayers((prev) =>
+      prev.map((layer) =>
+        layer.id === layerId ? { ...layer, name: newName.trim() } : layer
+      )
+    );
+  };
+
+  const startEditingLayer = (layerId: string, currentName: string) => {
+    setEditingLayerId(layerId);
+    setEditingLayerName(currentName);
+  };
+
+  const cancelEditingLayer = () => {
+    setEditingLayerId(null);
+    setEditingLayerName("");
+  };
+
+  const saveEditingLayer = () => {
+    if (editingLayerId && editingLayerName.trim()) {
+      updateLayerName(editingLayerId, editingLayerName);
+    }
+    cancelEditingLayer();
+  };
+
+  const startEditingElement = (elementId: string, currentName: string) => {
+    setEditingElementId(elementId);
+    setEditingElementName(currentName);
+  };
+
+  const cancelEditingElement = () => {
+    setEditingElementId(null);
+    setEditingElementName("");
+  };
+
+  const saveEditingElement = () => {
+    if (editingElementId && editingElementName.trim()) {
+      updateElementName(editingElementId, editingElementName);
+    }
+    cancelEditingElement();
+  };
+
+  const startEditingImpactZone = (zoneId: string, currentName: string) => {
+    setEditingImpactZoneId(zoneId);
+    setEditingImpactZoneName(currentName);
+  };
+
+  const cancelEditingImpactZone = () => {
+    setEditingImpactZoneId(null);
+    setEditingImpactZoneName("");
+  };
+
+  const saveEditingImpactZone = () => {
+    if (editingImpactZoneId && editingImpactZoneName.trim()) {
+      updateImpactZoneName(editingImpactZoneId, editingImpactZoneName);
+    }
+    cancelEditingImpactZone();
+  };
+
+  const updateElementName = (elementId: string, newName: string) => {
+    if (!newName.trim()) return;
+
+    setElements((prev) =>
+      prev.map((element) =>
+        element.id === elementId
+          ? { ...element, name: newName.trim() }
+          : element
+      )
+    );
+  };
+
+  const updateImpactZoneName = (zoneId: string, newName: string) => {
+    if (!newName.trim()) return;
+
+    setImpactZones((prev) =>
+      prev.map((zone) =>
+        zone.id === zoneId ? { ...zone, name: newName.trim() } : zone
+      )
+    );
+  };
+
+  const addImpactZone = () => {
+    if (!newImpactZoneName.trim()) return;
+
+    const newImpactZone: ImpactZone = {
+      id: Date.now().toString(),
+      name: newImpactZoneName,
+      x: centerX + (Math.random() - 0.5) * 200,
+      y: centerY + (Math.random() - 0.5) * 200,
+      radius: 60,
+    };
+
+    setImpactZones((prev) => [...prev, newImpactZone]);
+    setNewImpactZoneName("");
   };
 
   const deleteElement = (elementId: string) => {
@@ -598,15 +851,57 @@ export default function AdvancedInfrastructureMapper() {
   };
 
   const deleteLayer = (layerId: string) => {
-    setLayers((prev) => prev.filter((layer) => layer.id !== layerId));
+    const updatedLayers = layers.filter((layer) => layer.id !== layerId);
+    const recalculatedLayers = recalculateLayerRadii(updatedLayers);
+    setLayers(recalculatedLayers);
   };
 
   const deleteConnection = (connectionId: string) => {
     setConnections((prev) => prev.filter((conn) => conn.id !== connectionId));
   };
 
+  const deleteImpactZone = (zoneId: string) => {
+    setImpactZones((prev) => prev.filter((zone) => zone.id !== zoneId));
+  };
+
+  const handleImpactZoneMouseDown = (zoneId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    if (svgRef.current) {
+      const rect = svgRef.current.getBoundingClientRect();
+
+      // Get mouse position in SVG coordinate system (accounting for viewBox)
+      const mouseX =
+        (e.clientX - rect.left) * (svgDimensions.width / rect.width);
+      const mouseY =
+        (e.clientY - rect.top) * (svgDimensions.height / rect.height);
+
+      // Find the impact zone
+      const zone = impactZones.find((z) => z.id === zoneId);
+
+      if (zone) {
+        // Calculate the offset between mouse position and zone center
+        const offsetX = mouseX - zone.x;
+        const offsetY = mouseY - zone.y;
+        setDragOffset({ x: offsetX, y: offsetY });
+      }
+    }
+
+    setDraggedImpactZone(zoneId);
+    setSelectedImpactZone(zoneId);
+  };
+
+  const handleImpactZoneResizeMouseDown = (
+    zoneId: string,
+    e: React.MouseEvent
+  ) => {
+    e.stopPropagation();
+    setResizingImpactZone(zoneId);
+    setResizeHandle("resize");
+  };
+
   const exportData = () => {
-    const data = { layers, threats, elements, connections };
+    const data = { layers, threats, elements, connections, impactZones };
     const blob = new Blob([JSON.stringify(data, null, 2)], {
       type: "application/json",
     });
@@ -630,6 +925,7 @@ export default function AdvancedInfrastructureMapper() {
         if (data.threats) setThreats(data.threats);
         if (data.elements) setElements(data.elements);
         if (data.connections) setConnections(data.connections);
+        if (data.impactZones) setImpactZones(data.impactZones);
       } catch (error) {
         console.error("Failed to import data:", error);
       }
@@ -692,328 +988,653 @@ export default function AdvancedInfrastructureMapper() {
   };
 
   // Mobile Control Panel Component
-  const ControlPanel = () => (
-    <div className="h-full flex flex-col">
-      <Tabs
-        value={activeTab}
-        onValueChange={setActiveTab}
-        className="flex-1 flex flex-col"
-      >
-        <TabsList className="grid w-full grid-cols-4 mx-2 mt-2">
-          <TabsTrigger value="elements" className="text-xs">
-            Elements
-          </TabsTrigger>
-          <TabsTrigger value="threats" className="text-xs">
-            Threats
-          </TabsTrigger>
-          <TabsTrigger value="layers" className="text-xs">
-            Layers
-          </TabsTrigger>
-          <TabsTrigger value="connections" className="text-xs">
-            Links
-          </TabsTrigger>
-        </TabsList>
+  const ControlPanel = useCallback(
+    () => (
+      <div className="h-full flex flex-col">
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="flex-1 flex flex-col"
+        >
+          <TabsList className="grid w-full grid-cols-5 mx-2 mt-2">
+            <TabsTrigger value="elements" className="text-xs">
+              Elements
+            </TabsTrigger>
+            <TabsTrigger value="threats" className="text-xs">
+              Threats
+            </TabsTrigger>
+            <TabsTrigger value="layers" className="text-xs">
+              Layers
+            </TabsTrigger>
+            <TabsTrigger value="impact" className="text-xs">
+              Impact
+            </TabsTrigger>
+            <TabsTrigger value="connections" className="text-xs">
+              Links
+            </TabsTrigger>
+          </TabsList>
 
-        <div className="flex-1 overflow-y-auto p-4">
-          <TabsContent value="elements" className="space-y-4 mt-0">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Plus className="w-4 h-4" />
-                  Add Infrastructure Element
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div>
-                  <Label className="text-xs">Name</Label>
-                  <Input
-                    placeholder="Element name"
-                    value={newElementName}
-                    onChange={(e) => setNewElementName(e.target.value)}
-                    onKeyPress={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        addElement();
-                      }
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                    onFocus={(e) => e.stopPropagation()}
-                  />
-                </div>
-
-                <Button onClick={addElement} size="sm" className="w-full">
-                  Add Element
-                </Button>
-              </CardContent>
-            </Card>
-
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">
-                Infrastructure Elements
-              </Label>
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {scaledElements.map((element) => (
-                  <div
-                    key={element.id}
-                    className={`flex items-center justify-between p-2 rounded border ${
-                      selectedElement === element.id
-                        ? "border-red-500 bg-red-50"
-                        : "border-gray-200"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 flex-1">
-                      <div className="flex-1">
-                        <div className="text-sm font-medium">
-                          {element.name}
-                        </div>
-                      </div>
-                    </div>
-                    <Button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        deleteElement(element.id);
+          <div className="flex-1 overflow-y-auto p-4">
+            <TabsContent value="elements" className="space-y-4 mt-0">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Plus className="w-4 h-4" />
+                    Add Infrastructure Element
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <Label className="text-xs">Name</Label>
+                    <Input
+                      placeholder="Element name"
+                      value={newElementName}
+                      onChange={(e) => setNewElementName(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          addElement();
+                        }
                       }}
-                      size="sm"
-                      variant="ghost"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {connectingFrom && (
-              <Card className="border-blue-200 bg-blue-50">
-                <CardContent className="p-3">
-                  <div className="text-sm text-blue-800 mb-2">
-                    Creating Connection
+                      onClick={(e) => e.stopPropagation()}
+                      onFocus={(e) => e.stopPropagation()}
+                    />
                   </div>
 
-                  <p className="text-xs text-blue-600 mt-2">
-                    Click another element to create connection
-                  </p>
+                  <Button onClick={addElement} size="sm" className="w-full">
+                    Add Element
+                  </Button>
                 </CardContent>
               </Card>
-            )}
-          </TabsContent>
 
-          <TabsContent value="threats" className="space-y-4 mt-0">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4" />
-                  Add Threat
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div>
-                  <Label className="text-xs">Name</Label>
-                  <Input
-                    placeholder="Threat name"
-                    value={newThreatName}
-                    onChange={(e) => setNewThreatName(e.target.value)}
-                    onKeyPress={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        addThreat();
-                      }
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                    onFocus={(e) => e.stopPropagation()}
-                  />
-                </div>
-
-                <Button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    addThreat();
-                  }}
-                  size="sm"
-                  className="w-full"
-                >
-                  Add Threat
-                </Button>
-              </CardContent>
-            </Card>
-
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">External Threats</Label>
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {threats.map((threat) => (
-                  <div
-                    key={threat.id}
-                    className="flex items-center justify-between p-2 rounded border border-gray-200"
-                  >
-                    <div className="flex-1">
-                      <div className="text-sm font-medium">{threat.name}</div>
-                      <div className="flex gap-1">
-                        <Badge variant="outline" className="text-xs">
-                          {Math.round(threat.angle)}°
-                        </Badge>
-                      </div>
-                    </div>
-                    <Button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        deleteThreat(threat.id);
-                      }}
-                      size="sm"
-                      variant="ghost"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="layers" className="space-y-4 mt-0">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Shield className="w-4 h-4" />
-                  Add Layer
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div>
-                  <Label className="text-xs">Name</Label>
-                  <Input
-                    placeholder="Layer name"
-                    value={newLayerName}
-                    onChange={(e) => setNewLayerName(e.target.value)}
-                    onKeyPress={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        addLayer();
-                      }
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                    onFocus={(e) => e.stopPropagation()}
-                  />
-                </div>
-                <Button onClick={addLayer} size="sm" className="w-full">
-                  Add Layer
-                </Button>
-              </CardContent>
-            </Card>
-
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Distance Layers</Label>
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {scaledLayers.map((layer) => (
-                  <div
-                    key={layer.id}
-                    className="flex items-center justify-between p-2 rounded border border-gray-200"
-                  >
-                    <div className="flex items-center gap-2 flex-1">
-                      <div>
-                        <div className="text-sm font-medium">{layer.name}</div>
-                        <div className="text-xs text-gray-500">
-                          Radius: {Math.round(layer.radius)}px
-                        </div>
-                      </div>
-                    </div>
-                    <Button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        deleteLayer(layer.id);
-                      }}
-                      size="sm"
-                      variant="ghost"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="connections" className="space-y-4 mt-0">
-            <div className="space-y-2">
-              <Label className="text-sm font-medium flex items-center gap-2">
-                <Zap className="w-4 h-4" />
-                Infrastructure Connections
-              </Label>
-              <div className="space-y-2 max-h-80 overflow-y-auto">
-                {connections.map((connection) => {
-                  const fromElement = scaledElements.find(
-                    (el) => el.id === connection.from
-                  );
-                  const toElement = scaledElements.find(
-                    (el) => el.id === connection.to
-                  );
-
-                  return (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">
+                  Infrastructure Elements
+                </Label>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {scaledElements.map((element) => (
                     <div
-                      key={connection.id}
-                      className="p-2 rounded border border-gray-200"
+                      key={element.id}
+                      className={`flex items-center gap-2 p-2 rounded border ${
+                        selectedElement === element.id
+                          ? "border-red-500 bg-red-50"
+                          : "border-gray-200"
+                      }`}
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="text-sm font-medium">
-                            {fromElement?.name} → {toElement?.name}
-                          </div>
-                          <div className="flex gap-1 mt-1">
-                            <Badge
-                              style={{
-                                backgroundColor:
-                                  connectionColors[connection.type],
+                      {/* Element content */}
+                      <div className="flex-1 min-w-0">
+                        {editingElementId === element.id ? (
+                          <div className="flex items-center gap-2">
+                            <Input
+                              value={editingElementName}
+                              onChange={(e) =>
+                                setEditingElementName(e.target.value)
+                              }
+                              onKeyPress={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  saveEditingElement();
+                                } else if (e.key === "Escape") {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  cancelEditingElement();
+                                }
                               }}
-                              className="text-xs text-white"
+                              onClick={(e) => e.stopPropagation()}
+                              onFocus={(e) => e.stopPropagation()}
+                              className="text-sm h-6"
+                              autoFocus
+                            />
+                            <Button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                saveEditingElement();
+                              }}
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 w-6 p-0"
                             >
-                              {connection.type}
-                            </Badge>
-                            <Badge variant="outline" className="text-xs">
-                              {connection.strength}
-                            </Badge>
+                              <Check className="w-3 h-3" />
+                            </Button>
+                            <Button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                cancelEditingElement();
+                              }}
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 w-6 p-0"
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
                           </div>
-                        </div>
+                        ) : (
+                          <div
+                            className="cursor-pointer group"
+                            onClick={() =>
+                              startEditingElement(element.id, element.name)
+                            }
+                          >
+                            <div className="text-sm font-medium flex items-center gap-2">
+                              {element.name}
+                              <Edit2 className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              Layer: {element.layer} • Position: (
+                              {Math.round(element.x)}, {Math.round(element.y)})
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Delete button */}
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          deleteElement(element.id);
+                        }}
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {connectingFrom && (
+                <Card className="border-blue-200 bg-blue-50">
+                  <CardContent className="p-3">
+                    <div className="text-sm text-blue-800 mb-2">
+                      Creating Connection
+                    </div>
+
+                    <p className="text-xs text-blue-600 mt-2">
+                      Click another element to create connection
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+
+            <TabsContent value="threats" className="space-y-4 mt-0">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4" />
+                    Add Threat
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <Label className="text-xs">Name</Label>
+                    <Input
+                      placeholder="Threat name"
+                      value={newThreatName}
+                      onChange={(e) => setNewThreatName(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          addThreat();
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      onFocus={(e) => e.stopPropagation()}
+                    />
+                  </div>
+
+                  <Button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      addThreat();
+                    }}
+                    size="sm"
+                    className="w-full"
+                  >
+                    Add Threat
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">External Threats</Label>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {threats.map((threat) => (
+                    <div
+                      key={threat.id}
+                      className="flex items-center justify-between p-2 rounded border border-gray-200"
+                    >
+                      <div className="flex-1">
+                        <div className="text-sm font-medium">{threat.name}</div>
+                      </div>
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          deleteThreat(threat.id);
+                        }}
+                        size="sm"
+                        variant="ghost"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="layers" className="space-y-4 mt-0">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Shield className="w-4 h-4" />
+                    Add Layer
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <Label className="text-xs">Name</Label>
+                    <Input
+                      placeholder="Layer name"
+                      value={newLayerName}
+                      onChange={(e) => setNewLayerName(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          addLayer();
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      onFocus={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                  <Button onClick={addLayer} size="sm" className="w-full">
+                    Add Layer
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Distance Layers</Label>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {scaledLayers.map((layer, index) => (
+                    <div
+                      key={layer.id}
+                      className="flex items-center gap-2 p-2 rounded border border-gray-200"
+                    >
+                      {/* Layer ordering controls */}
+                      <div className="flex flex-col gap-1">
                         <Button
                           onClick={(e) => {
                             e.stopPropagation();
                             e.preventDefault();
-                            deleteConnection(connection.id);
+                            moveLayer(layer.id, "up");
                           }}
                           size="sm"
                           variant="ghost"
+                          className="h-4 w-4 p-0"
+                          disabled={index === 0}
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <ChevronUp className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            moveLayer(layer.id, "down");
+                          }}
+                          size="sm"
+                          variant="ghost"
+                          className="h-4 w-4 p-0"
+                          disabled={index === scaledLayers.length - 1}
+                        >
+                          <ChevronDown className="w-3 h-3" />
                         </Button>
                       </div>
+
+                      {/* Layer content */}
+                      <div className="flex-1 min-w-0">
+                        {editingLayerId === layer.id ? (
+                          <div className="flex items-center gap-2">
+                            <Input
+                              value={editingLayerName}
+                              onChange={(e) =>
+                                setEditingLayerName(e.target.value)
+                              }
+                              onKeyPress={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  saveEditingLayer();
+                                } else if (e.key === "Escape") {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  cancelEditingLayer();
+                                }
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              onFocus={(e) => e.stopPropagation()}
+                              className="text-sm h-6"
+                              autoFocus
+                            />
+                            <Button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                saveEditingLayer();
+                              }}
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 w-6 p-0"
+                            >
+                              <Check className="w-3 h-3" />
+                            </Button>
+                            <Button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                cancelEditingLayer();
+                              }}
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 w-6 p-0"
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div
+                            className="cursor-pointer group"
+                            onClick={() =>
+                              startEditingLayer(layer.id, layer.name)
+                            }
+                          >
+                            <div className="text-sm font-medium flex items-center gap-2">
+                              {layer.name}
+                              <Edit2 className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              Radius: {Math.round(layer.radius)}px • Index:{" "}
+                              {index + 1}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Delete button */}
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          deleteLayer(layer.id);
+                        }}
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="impact" className="space-y-4 mt-0">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4" />
+                    Add Impact Zone
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <Label className="text-xs">Name</Label>
+                    <Input
+                      placeholder="Impact zone name"
+                      value={newImpactZoneName}
+                      onChange={(e) => setNewImpactZoneName(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          addImpactZone();
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      onFocus={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                  <Button onClick={addImpactZone} size="sm" className="w-full">
+                    Add Impact Zone
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Impact Zones</Label>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {impactZones.map((zone) => (
+                    <div
+                      key={zone.id}
+                      className={`flex items-center gap-2 p-2 rounded border ${
+                        selectedImpactZone === zone.id
+                          ? "border-blue-500 bg-blue-50"
+                          : "border-gray-200"
+                      }`}
+                    >
+                      {/* Impact zone content */}
+                      <div className="flex-1 min-w-0">
+                        {editingImpactZoneId === zone.id ? (
+                          <div className="flex items-center gap-2">
+                            <Input
+                              value={editingImpactZoneName}
+                              onChange={(e) =>
+                                setEditingImpactZoneName(e.target.value)
+                              }
+                              onKeyPress={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  saveEditingImpactZone();
+                                } else if (e.key === "Escape") {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  cancelEditingImpactZone();
+                                }
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              onFocus={(e) => e.stopPropagation()}
+                              className="text-sm h-6"
+                              autoFocus
+                            />
+                            <Button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                saveEditingImpactZone();
+                              }}
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 w-6 p-0"
+                            >
+                              <Check className="w-3 h-3" />
+                            </Button>
+                            <Button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                cancelEditingImpactZone();
+                              }}
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 w-6 p-0"
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div
+                            className="cursor-pointer group"
+                            onClick={() =>
+                              startEditingImpactZone(zone.id, zone.name)
+                            }
+                          >
+                            <div className="text-sm font-medium flex items-center gap-2">
+                              {zone.name}
+                              <Edit2 className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              Radius: {Math.round(zone.radius)}px • Position: (
+                              {Math.round(zone.x)}, {Math.round(zone.y)})
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Delete button */}
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          deleteImpactZone(zone.id);
+                        }}
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="connections" className="space-y-4 mt-0">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium flex items-center gap-2">
+                  <Zap className="w-4 h-4" />
+                  Infrastructure Connections
+                </Label>
+                <div className="space-y-2 max-h-80 overflow-y-auto">
+                  {connections.map((connection) => {
+                    const fromElement = scaledElements.find(
+                      (el) => el.id === connection.from
+                    );
+                    const toElement = scaledElements.find(
+                      (el) => el.id === connection.to
+                    );
+
+                    return (
+                      <div
+                        key={connection.id}
+                        className="p-2 rounded border border-gray-200"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="text-sm font-medium">
+                              {fromElement?.name} → {toElement?.name}
+                            </div>
+                            <div className="flex gap-1 mt-1">
+                              <Badge
+                                style={{
+                                  backgroundColor:
+                                    connectionColors[
+                                      (connection.type ||
+                                        "dependency") as keyof typeof connectionColors
+                                    ],
+                                }}
+                                className="text-xs text-white"
+                              >
+                                {connection.type || "dependency"}
+                              </Badge>
+                              <Badge variant="outline" className="text-xs">
+                                {connection.strength}
+                              </Badge>
+                            </div>
+                          </div>
+                          <Button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              deleteConnection(connection.id);
+                            }}
+                            size="sm"
+                            variant="ghost"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </TabsContent>
+          </div>
+
+          <div className="p-4 border-t bg-gray-50">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Instructions</Label>
+              <div className="text-xs text-gray-600 space-y-1">
+                <p>• Drag elements to reposition them</p>
+                <p>• Click an element to start connecting</p>
+                <p>• Set connection type before linking</p>
+                <p>• Click connections to delete them</p>
+                <p>• Threats auto-create map segments</p>
+                <p>• Create custom impact zones with names</p>
+                <p>• Drag impact zones to move them</p>
+                <p>• Use resize handle to adjust zone size</p>
+                <p>• Toggle segments display</p>
+                <p>• Click layer names to edit them</p>
+                <p>• Use ↑↓ arrows to reorder layers</p>
+                <p>• Layers auto-resize to eliminate gaps</p>
+                <p>• Click element names to edit them</p>
+                <p>• Click impact zone names to edit them</p>
+                <p>• Drag red handles to resize segments</p>
               </div>
             </div>
-          </TabsContent>
-        </div>
-
-        <div className="p-4 border-t bg-gray-50">
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Instructions</Label>
-            <div className="text-xs text-gray-600 space-y-1">
-              <p>• Drag elements to reposition them</p>
-              <p>• Click an element to start connecting</p>
-              <p>• Set connection type before linking</p>
-              <p>• Click connections to delete them</p>
-              <p>• Threats auto-create map segments</p>
-              <p>• Toggle segments and impact zones</p>
-            </div>
           </div>
-        </div>
-      </Tabs>
-    </div>
+        </Tabs>
+      </div>
+    ),
+    [
+      activeTab,
+      newElementName,
+      newThreatName,
+      newLayerName,
+      newImpactZoneName,
+      scaledElements,
+      selectedElement,
+      connectingFrom,
+      threats,
+      layers,
+      impactZones,
+      selectedImpactZone,
+      connections,
+      addElement,
+      addThreat,
+      addLayer,
+      addImpactZone,
+      deleteElement,
+      deleteThreat,
+      deleteLayer,
+      deleteImpactZone,
+      deleteConnection,
+    ]
   );
 
   return (
@@ -1033,7 +1654,7 @@ export default function AdvancedInfrastructureMapper() {
                 <div className="flex items-center justify-between p-4 border-b">
                   <h2 className="text-lg font-semibold">Controls</h2>
                 </div>
-                <ControlPanel />
+                {ControlPanel()}
               </SheetContent>
             </Sheet>
             <h1 className="text-lg sm:text-xl font-bold">
@@ -1048,14 +1669,6 @@ export default function AdvancedInfrastructureMapper() {
             >
               <span className="hidden sm:inline">Segments</span>
               <span className="sm:hidden">Seg</span>
-            </Button>
-            <Button
-              onClick={() => setShowThreatImpact(!showThreatImpact)}
-              variant={showThreatImpact ? "default" : "outline"}
-              size="sm"
-            >
-              <span className="hidden sm:inline">Impact Zones</span>
-              <span className="sm:hidden">Impact</span>
             </Button>
             <Button onClick={exportData} size="sm" variant="outline">
               <Download className="w-4 h-4 sm:mr-1" />
@@ -1090,6 +1703,7 @@ export default function AdvancedInfrastructureMapper() {
             onMouseUp={handleMouseUp}
             onClick={() => {
               setSelectedElement(null);
+              setSelectedImpactZone(null);
               setConnectingFrom(null);
             }}
           >
@@ -1143,6 +1757,27 @@ export default function AdvancedInfrastructureMapper() {
                       strokeWidth={1}
                       strokeOpacity={0.4}
                     />
+                    {/* Draggable handle at the end of the radial line */}
+                    <circle
+                      cx={
+                        centerX +
+                        Math.cos((segment.startAngle * Math.PI) / 180) *
+                          actualMaxRadius
+                      }
+                      cy={
+                        centerY +
+                        Math.sin((segment.startAngle * Math.PI) / 180) *
+                          actualMaxRadius
+                      }
+                      r={8}
+                      fill="#ef4444"
+                      stroke="white"
+                      strokeWidth={2}
+                      className="cursor-pointer hover:fill-red-600"
+                      onMouseDown={(e) =>
+                        handleSegmentMouseDown(segment.threat.id, e)
+                      }
+                    />
                     {/* Segment label */}
                     <text
                       x={labelPos.x}
@@ -1190,31 +1825,61 @@ export default function AdvancedInfrastructureMapper() {
               </text>
             ))}
 
-            {/* Threat impact zones */}
-            {showThreatImpact &&
-              threats.map((threat) => {
-                const scale =
-                  Math.min(svgDimensions.width, svgDimensions.height) / 800;
-                const scaledImpactRadius = threat.impactRadius * scale;
-                const pos = getThreatPosition(
-                  threat.angle,
-                  actualMaxRadius - scaledImpactRadius
-                );
-                return (
+            {/* Custom Impact Zones */}
+            {impactZones.map((zone) => {
+              const isSelected = selectedImpactZone === zone.id;
+
+              return (
+                <g key={`custom-impact-${zone.id}`}>
+                  {/* Main impact zone circle */}
                   <circle
-                    key={`impact-${threat.id}`}
-                    cx={pos.x}
-                    cy={pos.y}
-                    r={scaledImpactRadius}
-                    fill="#ef4444"
+                    cx={zone.x}
+                    cy={zone.y}
+                    r={zone.radius}
+                    fill="#3b82f6"
                     fillOpacity={0.15}
-                    stroke="#ef4444"
-                    strokeWidth={2}
-                    strokeOpacity={0.5}
+                    stroke={isSelected ? "#3b82f6" : "#3b82f6"}
+                    strokeWidth={isSelected ? 3 : 2}
+                    strokeOpacity={0.7}
                     strokeDasharray="5,5"
+                    className="cursor-move hover:stroke-blue-600"
+                    onMouseDown={(e) => handleImpactZoneMouseDown(zone.id, e)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedImpactZone(zone.id);
+                    }}
                   />
-                );
-              })}
+
+                  {/* Impact zone label */}
+                  <text
+                    x={zone.x}
+                    y={zone.y}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    className="text-sm font-medium fill-blue-700 pointer-events-none select-none"
+                    style={{ userSelect: "none" }}
+                  >
+                    {zone.name}
+                  </text>
+
+                  {/* Resize handle - only show when selected */}
+                  {isSelected && (
+                    <circle
+                      cx={zone.x + zone.radius - 10}
+                      cy={zone.y}
+                      r={6}
+                      fill="#3b82f6"
+                      stroke="white"
+                      strokeWidth={2}
+                      className="cursor-pointer hover:fill-blue-700"
+                      onMouseDown={(e) =>
+                        handleImpactZoneResizeMouseDown(zone.id, e)
+                      }
+                    />
+                  )}
+                </g>
+              );
+            })}
 
             {/* Connections */}
             {connections.map((connection) => {
@@ -1237,7 +1902,9 @@ export default function AdvancedInfrastructureMapper() {
                   strokeWidth={2}
                   className="cursor-pointer hover:opacity-50"
                   strokeDasharray={
-                    connection.type === "backup" ? "5,5" : "none"
+                    (connection.type || "dependency") === "backup"
+                      ? "5,5"
+                      : "none"
                   }
                   onClick={(e) => {
                     e.stopPropagation();
@@ -1375,7 +2042,7 @@ export default function AdvancedInfrastructureMapper() {
 
       {/* Desktop Sidebar */}
       <div className="hidden lg:block w-96 bg-white border-l border-gray-200 overflow-y-auto">
-        <ControlPanel />
+        {ControlPanel()}
       </div>
     </div>
   );
