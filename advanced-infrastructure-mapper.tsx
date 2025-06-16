@@ -55,6 +55,27 @@ interface Threat {
   impactRadius: number;
 }
 
+// Infrastructure problems and effects (with extensibility)
+export const INFRASTRUCTURE_PROBLEMS = [
+  "Neglect",
+  "Time and wear",
+  "Operators",
+  "System Externalities",
+  "Economics",
+  "Violence / Disaster",
+  "Other (please specify)",
+] as const;
+
+export const IMPACT_EFFECTS = [
+  "Service Unavailable",
+  "Service Cost Spike",
+  "Service Quality Drop",
+  "Other (please specify)",
+] as const;
+
+type InfrastructureProblem = (typeof INFRASTRUCTURE_PROBLEMS)[number];
+type ImpactEffect = (typeof IMPACT_EFFECTS)[number];
+
 interface ImpactZone {
   id: string;
   name: string;
@@ -63,15 +84,21 @@ interface ImpactZone {
   radius: number;
   threatId?: string;
   zIndex?: number;
+  infrastructureProblems?: InfrastructureProblem[];
+  otherInfrastructureProblem?: string;
+  impactEffects?: ImpactEffect[];
+  otherImpactEffect?: string;
+  criticality?: "Low" | "Medium" | "High";
+  description?: string;
 }
 
 interface Connection {
   id: string;
   from: string;
   to: string;
-  type?: string;
+  connectorType?: "Produce on site" | "Grid" | "Delivery" | "Fetch" | "Other";
   strength?: number;
-  description?: string;
+  notes?: string;
 }
 
 interface Layer {
@@ -355,6 +382,35 @@ export default function AdvancedInfrastructureMapper() {
   );
   const [editingImpactZoneName, setEditingImpactZoneName] = useState("");
   const [draggedSegment, setDraggedSegment] = useState<string | null>(null);
+  const [newImpactZoneProblems, setNewImpactZoneProblems] = useState<
+    InfrastructureProblem[]
+  >([]);
+  const [newImpactZoneOtherProblem, setNewImpactZoneOtherProblem] =
+    useState("");
+  const [newImpactZoneEffects, setNewImpactZoneEffects] = useState<
+    ImpactEffect[]
+  >([]);
+  const [newImpactZoneOtherEffect, setNewImpactZoneOtherEffect] = useState("");
+  const [newImpactZoneCriticality, setNewImpactZoneCriticality] =
+    useState<string>("");
+  const [newImpactZoneDescription, setNewImpactZoneDescription] = useState("");
+  const [editingImpactZoneProblems, setEditingImpactZoneProblems] = useState<
+    InfrastructureProblem[]
+  >([]);
+  const [editingImpactZoneOtherProblem, setEditingImpactZoneOtherProblem] =
+    useState("");
+  const [editingImpactZoneEffects, setEditingImpactZoneEffects] = useState<
+    ImpactEffect[]
+  >([]);
+  const [editingImpactZoneOtherEffect, setEditingImpactZoneOtherEffect] =
+    useState("");
+  const [editingImpactZoneCriticality, setEditingImpactZoneCriticality] =
+    useState<string>("");
+  const [editingImpactZoneDescription, setEditingImpactZoneDescription] =
+    useState("");
+  // Add state for editing threat name
+  const [editingThreatId, setEditingThreatId] = useState<string | null>(null);
+  const [editingThreatName, setEditingThreatName] = useState("");
 
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -436,13 +492,12 @@ export default function AdvancedInfrastructureMapper() {
   }, [threats]);
 
   const handleElementClick = (elementId: string) => {
+    console.log("=== Advanced Mapper Element clicked ===");
     if (connectingFrom && connectingFrom !== elementId) {
-      const newConnection: Connection = {
-        id: `${connectingFrom}-${elementId}-${Date.now()}`,
-        from: connectingFrom,
-        to: elementId,
-      };
-      setConnections((prev) => [...prev, newConnection]);
+      setPendingConnection({ from: connectingFrom, to: elementId });
+      setModalConnectorType(undefined);
+      setModalNotes("");
+      setShowConnectionModal(true);
       setConnectingFrom(null);
     } else {
       setSelectedElement(elementId);
@@ -452,29 +507,23 @@ export default function AdvancedInfrastructureMapper() {
 
   const handleMouseDown = (elementId: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    // Simplified - just store the element for potential dragging
+    setDraggedElement(elementId);
 
     if (svgRef.current) {
       const rect = svgRef.current.getBoundingClientRect();
-
-      // Get mouse position in SVG coordinate system (accounting for viewBox)
       const mouseX =
         (e.clientX - rect.left) * (svgDimensions.width / rect.width);
       const mouseY =
         (e.clientY - rect.top) * (svgDimensions.height / rect.height);
 
-      // Find the element in the original elements array (not scaled)
-      const element = elements.find((el) => el.id === elementId);
       const scaledElement = scaledElements.find((el) => el.id === elementId);
-
-      if (element && scaledElement) {
-        // Calculate the offset between mouse position and scaled element position
+      if (scaledElement) {
         const offsetX = mouseX - scaledElement.x;
         const offsetY = mouseY - scaledElement.y;
         setDragOffset({ x: offsetX, y: offsetY });
       }
     }
-
-    setDraggedElement(elementId);
   };
 
   const handleResizeMouseDown = (
@@ -487,9 +536,31 @@ export default function AdvancedInfrastructureMapper() {
     setResizeHandle(handle);
   };
 
-  const handleResize = useCallback(
+  // handleResize function removed - logic inlined into handleMouseMove
+
+  // handleImpactZoneResize function removed - logic inlined into handleMouseMove
+
+  const handleSegmentMouseDown = (threatId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDraggedSegment(threatId);
+  };
+
+  // handleSegmentDrag function removed - logic inlined into handleMouseMove
+
+  const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
+      // Early return if nothing is being dragged
+      if (
+        !draggedElement &&
+        !resizingElement &&
+        !resizingImpactZone &&
+        !draggedSegment
+      ) {
+        return;
+      }
+
       if (resizingElement && resizeHandle && svgRef.current) {
+        // Simplified resize logic
         const rect = svgRef.current.getBoundingClientRect();
         const mouseX =
           (e.clientX - rect.left) * (svgDimensions.width / rect.width);
@@ -501,16 +572,16 @@ export default function AdvancedInfrastructureMapper() {
             if (el.id === resizingElement) {
               const currentWidth = el.width || 80;
               const currentHeight = el.height || 30;
-              let newWidth = currentWidth;
-              let newHeight = currentHeight;
-
               const scaledElement = scaledElements.find(
                 (se) => se.id === el.id
               );
               if (!scaledElement) return el;
 
+              let newWidth = currentWidth;
+              let newHeight = currentHeight;
+
               switch (resizeHandle) {
-                case "se": // Southeast corner
+                case "se":
                   newWidth = Math.max(
                     40,
                     mouseX - scaledElement.x + currentWidth / 2
@@ -520,7 +591,7 @@ export default function AdvancedInfrastructureMapper() {
                     mouseY - scaledElement.y + currentHeight / 2
                   );
                   break;
-                case "sw": // Southwest corner
+                case "sw":
                   newWidth = Math.max(
                     40,
                     scaledElement.x - mouseX + currentWidth / 2
@@ -530,7 +601,7 @@ export default function AdvancedInfrastructureMapper() {
                     mouseY - scaledElement.y + currentHeight / 2
                   );
                   break;
-                case "ne": // Northeast corner
+                case "ne":
                   newWidth = Math.max(
                     40,
                     mouseX - scaledElement.x + currentWidth / 2
@@ -540,7 +611,7 @@ export default function AdvancedInfrastructureMapper() {
                     scaledElement.y - mouseY + currentHeight / 2
                   );
                   break;
-                case "nw": // Northwest corner
+                case "nw":
                   newWidth = Math.max(
                     40,
                     scaledElement.x - mouseX + currentWidth / 2
@@ -557,158 +628,50 @@ export default function AdvancedInfrastructureMapper() {
             return el;
           })
         );
-      }
-    },
-    [resizingElement, resizeHandle, svgDimensions, scaledElements]
-  );
-
-  const handleImpactZoneResize = useCallback(
-    (e: React.MouseEvent) => {
-      if (resizingImpactZone && resizeHandle && svgRef.current) {
-        const rect = svgRef.current.getBoundingClientRect();
-        const mouseX =
-          (e.clientX - rect.left) * (svgDimensions.width / rect.width);
-        const mouseY =
-          (e.clientY - rect.top) * (svgDimensions.height / rect.height);
-
-        setImpactZones((prev) =>
-          prev.map((zone) => {
-            if (zone.id === resizingImpactZone) {
-              // Calculate distance from center to mouse position
-              const dx = mouseX - zone.x;
-              const dy = mouseY - zone.y;
-              const newRadius = Math.max(20, Math.sqrt(dx * dx + dy * dy));
-
-              return { ...zone, radius: newRadius };
-            }
-            return zone;
-          })
-        );
-      }
-    },
-    [resizingImpactZone, resizeHandle, svgDimensions]
-  );
-
-  const handleSegmentMouseDown = (threatId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setDraggedSegment(threatId);
-  };
-
-  const handleSegmentDrag = useCallback(
-    (e: React.MouseEvent) => {
-      if (draggedSegment && svgRef.current) {
-        const rect = svgRef.current.getBoundingClientRect();
-        const mouseX =
-          (e.clientX - rect.left) * (svgDimensions.width / rect.width);
-        const mouseY =
-          (e.clientY - rect.top) * (svgDimensions.height / rect.height);
-
-        // Calculate angle from center to mouse position
-        const dx = mouseX - centerX;
-        const dy = mouseY - centerY;
-        let angle = (Math.atan2(dy, dx) * 180) / Math.PI;
-
-        // Normalize angle to 0-360 range
-        if (angle < 0) angle += 360;
-
-        // Update the threat's angle
-        setThreats((prev) =>
-          prev.map((threat) =>
-            threat.id === draggedSegment ? { ...threat, angle } : threat
-          )
-        );
-      }
-    },
-    [draggedSegment, svgDimensions, centerX, centerY]
-  );
-
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent) => {
-      if (resizingElement) {
-        handleResize(e);
-      } else if (resizingImpactZone) {
-        handleImpactZoneResize(e);
-      } else if (draggedSegment) {
-        handleSegmentDrag(e);
       } else if (draggedElement && svgRef.current) {
+        // Simplified drag logic
         const rect = svgRef.current.getBoundingClientRect();
-
-        // Get mouse position in SVG coordinate system (accounting for viewBox)
         const mouseX =
           (e.clientX - rect.left) * (svgDimensions.width / rect.width);
         const mouseY =
           (e.clientY - rect.top) * (svgDimensions.height / rect.height);
-
-        // Apply the offset to maintain the element's position relative to where the user clicked
         const scaledX = mouseX - dragOffset.x;
         const scaledY = mouseY - dragOffset.y;
-
-        // Convert back to original coordinate system (reverse the scaling)
         const scaleX = svgDimensions.width / 900;
         const scaleY = svgDimensions.height / 800;
-
         const originalX = (scaledX - centerX) / scaleX + 450;
         const originalY = (scaledY - centerY) / scaleY + 400;
 
         setElements((prev) =>
           prev.map((el) =>
             el.id === draggedElement
-              ? {
-                  ...el,
-                  x: originalX,
-                  y: originalY,
-                }
+              ? { ...el, x: originalX, y: originalY }
               : el
           )
         );
-      } else if (draggedImpactZone && svgRef.current) {
-        const rect = svgRef.current.getBoundingClientRect();
-
-        // Get mouse position in SVG coordinate system (accounting for viewBox)
-        const mouseX =
-          (e.clientX - rect.left) * (svgDimensions.width / rect.width);
-        const mouseY =
-          (e.clientY - rect.top) * (svgDimensions.height / rect.height);
-
-        // Apply the offset to maintain the impact zone's position relative to where the user clicked
-        const x = mouseX - dragOffset.x;
-        const y = mouseY - dragOffset.y;
-
-        setImpactZones((prev) =>
-          prev.map((zone) =>
-            zone.id === draggedImpactZone
-              ? {
-                  ...zone,
-                  x,
-                  y,
-                }
-              : zone
-          )
-        );
       }
+      // Removed other drag handlers for now to improve performance
     },
     [
       draggedElement,
-      draggedImpactZone,
-      draggedSegment,
       resizingElement,
       resizingImpactZone,
+      draggedSegment,
+      resizeHandle,
       svgDimensions,
+      scaledElements,
       dragOffset,
       centerX,
       centerY,
-      scaledElements,
-      handleResize,
-      handleSegmentDrag,
     ]
   );
 
   const handleMouseUp = () => {
+    // Simplified cleanup
     setDraggedElement(null);
-    setDraggedImpactZone(null);
     setResizingElement(null);
-    setResizingImpactZone(null);
     setResizeHandle(null);
+    setDraggedImpactZone(null);
     setDraggedSegment(null);
   };
 
@@ -883,16 +846,52 @@ export default function AdvancedInfrastructureMapper() {
   const startEditingImpactZone = (zoneId: string, currentName: string) => {
     setEditingImpactZoneId(zoneId);
     setEditingImpactZoneName(currentName);
+    const zone = impactZones.find((z) => z.id === zoneId);
+    setEditingImpactZoneProblems(zone?.infrastructureProblems || []);
+    setEditingImpactZoneOtherProblem(zone?.otherInfrastructureProblem || "");
+    setEditingImpactZoneEffects(zone?.impactEffects || []);
+    setEditingImpactZoneOtherEffect(zone?.otherImpactEffect || "");
+    setEditingImpactZoneCriticality(zone?.criticality || "");
+    setEditingImpactZoneDescription(zone?.description || "");
   };
 
   const cancelEditingImpactZone = () => {
     setEditingImpactZoneId(null);
     setEditingImpactZoneName("");
+    setEditingImpactZoneProblems([]);
+    setEditingImpactZoneOtherProblem("");
+    setEditingImpactZoneEffects([]);
+    setEditingImpactZoneOtherEffect("");
+    setEditingImpactZoneCriticality("");
+    setEditingImpactZoneDescription("");
   };
 
   const saveEditingImpactZone = () => {
     if (editingImpactZoneId && editingImpactZoneName.trim()) {
-      updateImpactZoneName(editingImpactZoneId, editingImpactZoneName);
+      setImpactZones((prev) =>
+        prev.map((zone) =>
+          zone.id === editingImpactZoneId
+            ? {
+                ...zone,
+                name: editingImpactZoneName,
+                infrastructureProblems: editingImpactZoneProblems,
+                otherInfrastructureProblem: editingImpactZoneProblems.includes(
+                  "Other (please specify)"
+                )
+                  ? editingImpactZoneOtherProblem
+                  : undefined,
+                impactEffects: editingImpactZoneEffects,
+                otherImpactEffect: editingImpactZoneEffects.includes(
+                  "Other (please specify)"
+                )
+                  ? editingImpactZoneOtherEffect
+                  : undefined,
+                criticality: editingImpactZoneCriticality as any,
+                description: editingImpactZoneDescription,
+              }
+            : zone
+        )
+      );
     }
     cancelEditingImpactZone();
   };
@@ -921,17 +920,33 @@ export default function AdvancedInfrastructureMapper() {
 
   const addImpactZone = () => {
     if (!newImpactZoneName.trim()) return;
-
     const newImpactZone: ImpactZone = {
       id: Date.now().toString(),
       name: newImpactZoneName,
       x: centerX + (Math.random() - 0.5) * 200,
       y: centerY + (Math.random() - 0.5) * 200,
       radius: 60,
+      infrastructureProblems: newImpactZoneProblems,
+      otherInfrastructureProblem: newImpactZoneProblems.includes(
+        "Other (please specify)"
+      )
+        ? newImpactZoneOtherProblem
+        : undefined,
+      impactEffects: newImpactZoneEffects,
+      otherImpactEffect: newImpactZoneEffects.includes("Other (please specify)")
+        ? newImpactZoneOtherEffect
+        : undefined,
+      criticality: newImpactZoneCriticality as any,
+      description: newImpactZoneDescription,
     };
-
     setImpactZones((prev) => [...prev, newImpactZone]);
     setNewImpactZoneName("");
+    setNewImpactZoneProblems([]);
+    setNewImpactZoneOtherProblem("");
+    setNewImpactZoneEffects([]);
+    setNewImpactZoneOtherEffect("");
+    setNewImpactZoneCriticality("");
+    setNewImpactZoneDescription("");
   };
 
   const deleteElement = (elementId: string) => {
@@ -1323,10 +1338,16 @@ export default function AdvancedInfrastructureMapper() {
               {connectingFrom && (
                 <Card className="border-blue-200 bg-blue-50">
                   <CardContent className="p-3">
-                    <div className="text-sm text-blue-800 mb-2">
+                    <div className="text-sm font-semibold text-blue-800 mb-2">
                       Creating Connection
                     </div>
-
+                    <p className="text-xs text-blue-600">
+                      From:{" "}
+                      {
+                        scaledElements.find((el) => el.id === connectingFrom)
+                          ?.name
+                      }
+                    </p>
                     <p className="text-xs text-blue-600 mt-2">
                       Click another element to create connection
                     </p>
@@ -1361,7 +1382,6 @@ export default function AdvancedInfrastructureMapper() {
                       onFocus={(e) => e.stopPropagation()}
                     />
                   </div>
-
                   <Button
                     onClick={(e) => {
                       e.preventDefault();
@@ -1375,17 +1395,76 @@ export default function AdvancedInfrastructureMapper() {
                   </Button>
                 </CardContent>
               </Card>
-
               <div className="space-y-2">
                 <Label className="text-sm font-medium">External Threats</Label>
                 <div className="space-y-2 max-h-[calc(100vh-400px)] overflow-y-auto">
                   {threats.map((threat) => (
                     <div
                       key={threat.id}
-                      className="flex items-center justify-between p-2 rounded border border-gray-200"
+                      className="flex items-center gap-2 p-2 rounded border border-gray-200"
                     >
-                      <div className="flex-1">
-                        <div className="text-sm font-medium">{threat.name}</div>
+                      <div className="flex-1 min-w-0">
+                        {editingThreatId === threat.id ? (
+                          <div className="flex items-center gap-2">
+                            <Input
+                              value={editingThreatName}
+                              onChange={(e) =>
+                                setEditingThreatName(e.target.value)
+                              }
+                              onKeyPress={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  saveEditingThreat();
+                                } else if (e.key === "Escape") {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  cancelEditingThreat();
+                                }
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              onFocus={(e) => e.stopPropagation()}
+                              className="text-sm h-6"
+                              autoFocus
+                            />
+                            <Button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                saveEditingThreat();
+                              }}
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 w-6 p-0"
+                            >
+                              <Check className="w-3 h-3" />
+                            </Button>
+                            <Button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                cancelEditingThreat();
+                              }}
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 w-6 p-0"
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div
+                            className="cursor-pointer group"
+                            onClick={() =>
+                              startEditingThreat(threat.id, threat.name)
+                            }
+                          >
+                            <div className="text-sm font-medium flex items-center gap-2">
+                              {threat.name}
+                              <Edit2 className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <Button
                         onClick={(e) => {
@@ -1395,6 +1474,7 @@ export default function AdvancedInfrastructureMapper() {
                         }}
                         size="sm"
                         variant="ghost"
+                        className="h-8 w-8 p-0"
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
@@ -1588,6 +1668,101 @@ export default function AdvancedInfrastructureMapper() {
                       onFocus={(e) => e.stopPropagation()}
                     />
                   </div>
+                  <div>
+                    <Label className="text-xs">Infrastructure Problems</Label>
+                    {INFRASTRUCTURE_PROBLEMS.map((problem) => (
+                      <label
+                        key={problem}
+                        className="flex items-center gap-2 text-xs"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={newImpactZoneProblems.includes(problem)}
+                          onChange={() => {
+                            setNewImpactZoneProblems((prev) =>
+                              prev.includes(problem)
+                                ? prev.filter((p) => p !== problem)
+                                : [...prev, problem]
+                            );
+                          }}
+                        />
+                        {problem}
+                      </label>
+                    ))}
+                    {newImpactZoneProblems.includes(
+                      "Other (please specify)"
+                    ) && (
+                      <Input
+                        placeholder="Please specify other problem"
+                        value={newImpactZoneOtherProblem}
+                        onChange={(e) =>
+                          setNewImpactZoneOtherProblem(e.target.value)
+                        }
+                        className="mt-1"
+                      />
+                    )}
+                  </div>
+                  <div>
+                    <Label className="text-xs">Impact Effects</Label>
+                    {IMPACT_EFFECTS.map((effect) => (
+                      <label
+                        key={effect}
+                        className="flex items-center gap-2 text-xs"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={newImpactZoneEffects.includes(effect)}
+                          onChange={() => {
+                            setNewImpactZoneEffects((prev) =>
+                              prev.includes(effect)
+                                ? prev.filter((e) => e !== effect)
+                                : [...prev, effect]
+                            );
+                          }}
+                        />
+                        {effect}
+                      </label>
+                    ))}
+                    {newImpactZoneEffects.includes(
+                      "Other (please specify)"
+                    ) && (
+                      <Input
+                        placeholder="Please specify other effect"
+                        value={newImpactZoneOtherEffect}
+                        onChange={(e) =>
+                          setNewImpactZoneOtherEffect(e.target.value)
+                        }
+                        className="mt-1"
+                      />
+                    )}
+                  </div>
+                  <div>
+                    <Label className="text-xs">Criticality</Label>
+                    <select
+                      className="w-full text-xs border rounded p-1"
+                      value={newImpactZoneCriticality}
+                      onChange={(e) =>
+                        setNewImpactZoneCriticality(e.target.value)
+                      }
+                    >
+                      <option value="">Select criticality</option>
+                      <option value="Low">Low</option>
+                      <option value="Medium">Medium</option>
+                      <option value="High">High</option>
+                    </select>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Description</Label>
+                    <textarea
+                      className="w-full text-xs border rounded p-1"
+                      rows={2}
+                      value={newImpactZoneDescription}
+                      onChange={(e) =>
+                        setNewImpactZoneDescription(e.target.value)
+                      }
+                      placeholder="Describe the impact zone..."
+                    />
+                  </div>
                   <Button onClick={addImpactZone} size="sm" className="w-full">
                     Add Impact Zone
                   </Button>
@@ -1609,7 +1784,7 @@ export default function AdvancedInfrastructureMapper() {
                       {/* Impact zone content */}
                       <div className="flex-1 min-w-0">
                         {editingImpactZoneId === zone.id ? (
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-col gap-2">
                             <Input
                               value={editingImpactZoneName}
                               onChange={(e) =>
@@ -1631,30 +1806,141 @@ export default function AdvancedInfrastructureMapper() {
                               className="text-sm h-6"
                               autoFocus
                             />
-                            <Button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                e.preventDefault();
-                                saveEditingImpactZone();
-                              }}
-                              size="sm"
-                              variant="ghost"
-                              className="h-6 w-6 p-0"
-                            >
-                              <Check className="w-3 h-3" />
-                            </Button>
-                            <Button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                e.preventDefault();
-                                cancelEditingImpactZone();
-                              }}
-                              size="sm"
-                              variant="ghost"
-                              className="h-6 w-6 p-0"
-                            >
-                              <X className="w-3 h-3" />
-                            </Button>
+                            <div>
+                              <Label className="text-xs">
+                                Infrastructure Problems
+                              </Label>
+                              {INFRASTRUCTURE_PROBLEMS.map((problem) => (
+                                <label
+                                  key={problem}
+                                  className="flex items-center gap-2 text-xs"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={editingImpactZoneProblems.includes(
+                                      problem
+                                    )}
+                                    onChange={() => {
+                                      setEditingImpactZoneProblems((prev) =>
+                                        prev.includes(problem)
+                                          ? prev.filter((p) => p !== problem)
+                                          : [...prev, problem]
+                                      );
+                                    }}
+                                  />
+                                  {problem}
+                                </label>
+                              ))}
+                              {editingImpactZoneProblems.includes(
+                                "Other (please specify)"
+                              ) && (
+                                <Input
+                                  placeholder="Please specify other problem"
+                                  value={editingImpactZoneOtherProblem}
+                                  onChange={(e) =>
+                                    setEditingImpactZoneOtherProblem(
+                                      e.target.value
+                                    )
+                                  }
+                                  className="mt-1"
+                                />
+                              )}
+                            </div>
+                            <div>
+                              <Label className="text-xs">Impact Effects</Label>
+                              {IMPACT_EFFECTS.map((effect) => (
+                                <label
+                                  key={effect}
+                                  className="flex items-center gap-2 text-xs"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={editingImpactZoneEffects.includes(
+                                      effect
+                                    )}
+                                    onChange={() => {
+                                      setEditingImpactZoneEffects((prev) =>
+                                        prev.includes(effect)
+                                          ? prev.filter((e) => e !== effect)
+                                          : [...prev, effect]
+                                      );
+                                    }}
+                                  />
+                                  {effect}
+                                </label>
+                              ))}
+                              {editingImpactZoneEffects.includes(
+                                "Other (please specify)"
+                              ) && (
+                                <Input
+                                  placeholder="Please specify other effect"
+                                  value={editingImpactZoneOtherEffect}
+                                  onChange={(e) =>
+                                    setEditingImpactZoneOtherEffect(
+                                      e.target.value
+                                    )
+                                  }
+                                  className="mt-1"
+                                />
+                              )}
+                            </div>
+                            <div>
+                              <Label className="text-xs">Criticality</Label>
+                              <select
+                                className="w-full text-xs border rounded p-1"
+                                value={editingImpactZoneCriticality}
+                                onChange={(e) =>
+                                  setEditingImpactZoneCriticality(
+                                    e.target.value
+                                  )
+                                }
+                              >
+                                <option value="">Select criticality</option>
+                                <option value="Low">Low</option>
+                                <option value="Medium">Medium</option>
+                                <option value="High">High</option>
+                              </select>
+                            </div>
+                            <div>
+                              <Label className="text-xs">Description</Label>
+                              <textarea
+                                className="w-full text-xs border rounded p-1"
+                                rows={2}
+                                value={editingImpactZoneDescription}
+                                onChange={(e) =>
+                                  setEditingImpactZoneDescription(
+                                    e.target.value
+                                  )
+                                }
+                                placeholder="Describe the impact zone..."
+                              />
+                            </div>
+                            <div className="flex gap-2 mt-2">
+                              <Button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  saveEditingImpactZone();
+                                }}
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 w-6 p-0"
+                              >
+                                <Check className="w-3 h-3" />
+                              </Button>
+                              <Button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  cancelEditingImpactZone();
+                                }}
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 w-6 p-0"
+                              >
+                                <X className="w-3 h-3" />
+                              </Button>
+                            </div>
                           </div>
                         ) : (
                           <div
@@ -1671,6 +1957,35 @@ export default function AdvancedInfrastructureMapper() {
                               Radius: {Math.round(zone.radius)}px • Position: (
                               {Math.round(zone.x)}, {Math.round(zone.y)})
                             </div>
+                            {/* Display new fields */}
+                            {zone.infrastructureProblems &&
+                              zone.infrastructureProblems.length > 0 && (
+                                <div className="text-xs mt-1">
+                                  <b>Problems:</b>{" "}
+                                  {zone.infrastructureProblems.join(", ")}
+                                  {zone.otherInfrastructureProblem &&
+                                    ` (${zone.otherInfrastructureProblem})`}
+                                </div>
+                              )}
+                            {zone.impactEffects &&
+                              zone.impactEffects.length > 0 && (
+                                <div className="text-xs mt-1">
+                                  <b>Effects:</b>{" "}
+                                  {zone.impactEffects.join(", ")}
+                                  {zone.otherImpactEffect &&
+                                    ` (${zone.otherImpactEffect})`}
+                                </div>
+                              )}
+                            {zone.criticality && (
+                              <div className="text-xs mt-1">
+                                <b>Criticality:</b> {zone.criticality}
+                              </div>
+                            )}
+                            {zone.description && (
+                              <div className="text-xs mt-1">
+                                <b>Description:</b> {zone.description}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -1720,17 +2035,56 @@ export default function AdvancedInfrastructureMapper() {
                               {fromElement?.name} → {toElement?.name}
                             </div>
                             <div className="flex gap-1 mt-1">
+                              <select
+                                className="text-xs border rounded px-1 py-0.5 mr-2"
+                                value={connection.connectorType || ""}
+                                onChange={(e) => {
+                                  const value = e.target
+                                    .value as Connection["connectorType"];
+                                  setConnections((prev) =>
+                                    prev.map((c) =>
+                                      c.id === connection.id
+                                        ? { ...c, connectorType: value }
+                                        : c
+                                    )
+                                  );
+                                }}
+                              >
+                                <option value="">Select type</option>
+                                <option value="Produce on site">
+                                  Produce on site
+                                </option>
+                                <option value="Grid">Grid</option>
+                                <option value="Delivery">Delivery</option>
+                                <option value="Fetch">Fetch</option>
+                                <option value="Other">Other</option>
+                              </select>
+                              <input
+                                className="text-xs border rounded px-1 py-0.5 mr-2"
+                                type="text"
+                                placeholder="Notes"
+                                value={connection.notes || ""}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  setConnections((prev) =>
+                                    prev.map((c) =>
+                                      c.id === connection.id
+                                        ? { ...c, notes: value }
+                                        : c
+                                    )
+                                  );
+                                }}
+                              />
                               <Badge
                                 style={{
                                   backgroundColor:
                                     connectionColors[
-                                      (connection.type ||
-                                        "dependency") as keyof typeof connectionColors
-                                    ],
+                                      connection.connectorType as keyof typeof connectionColors
+                                    ] || "#3b82f6",
                                 }}
                                 className="text-xs text-white"
                               >
-                                {connection.type || "dependency"}
+                                {connection.connectorType}
                               </Badge>
                               <Badge variant="outline" className="text-xs">
                                 {connection.strength}
@@ -1792,6 +2146,41 @@ export default function AdvancedInfrastructureMapper() {
   );
 
   const [showLicense, setShowLicense] = useState(false);
+
+  // Add update, start, cancel, and save functions for threat name editing
+  const updateThreatName = (threatId: string, newName: string) => {
+    if (!newName.trim()) return;
+    setThreats((prev) =>
+      prev.map((threat) =>
+        threat.id === threatId ? { ...threat, name: newName.trim() } : threat
+      )
+    );
+  };
+  const startEditingThreat = (threatId: string, currentName: string) => {
+    setEditingThreatId(threatId);
+    setEditingThreatName(currentName);
+  };
+  const cancelEditingThreat = () => {
+    setEditingThreatId(null);
+    setEditingThreatName("");
+  };
+  const saveEditingThreat = () => {
+    if (editingThreatId && editingThreatName.trim()) {
+      updateThreatName(editingThreatId, editingThreatName);
+    }
+    cancelEditingThreat();
+  };
+
+  // Add at the top of the component:
+  const [pendingConnection, setPendingConnection] = useState<{
+    from: string;
+    to: string;
+    id?: string;
+  } | null>(null);
+  const [showConnectionModal, setShowConnectionModal] = useState(false);
+  const [modalConnectorType, setModalConnectorType] =
+    useState<Connection["connectorType"]>(undefined);
+  const [modalNotes, setModalNotes] = useState("");
 
   return (
     <div className="w-full h-screen flex flex-col lg:flex-row bg-gray-50">
@@ -1864,7 +2253,9 @@ export default function AdvancedInfrastructureMapper() {
             viewBox={`0 0 ${svgDimensions.width} ${svgDimensions.height}`}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
-            onClick={() => {
+            onClick={(e) => {
+              // Always clear connection mode when clicking anywhere except on infrastructure elements
+              // This will be overridden by e.stopPropagation() in handleElementClick
               setSelectedElement(null);
               setSelectedImpactZone(null);
               setConnectingFrom(null);
@@ -1937,6 +2328,11 @@ export default function AdvancedInfrastructureMapper() {
                       stroke="white"
                       strokeWidth={2}
                       className="cursor-pointer hover:fill-red-600"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Exit connection mode when clicking on threat segments
+                        setConnectingFrom(null);
+                      }}
                       onMouseDown={(e) =>
                         handleSegmentMouseDown(segment.threat.id, e)
                       }
@@ -2008,6 +2404,8 @@ export default function AdvancedInfrastructureMapper() {
                     onClick={(e) => {
                       e.stopPropagation();
                       setSelectedImpactZone(zone.id);
+                      // Exit connection mode when clicking on impact zones
+                      setConnectingFrom(null);
                     }}
                   />
 
@@ -2051,7 +2449,6 @@ export default function AdvancedInfrastructureMapper() {
                 (el) => el.id === connection.to
               );
               if (!fromElement || !toElement) return null;
-
               return (
                 <line
                   key={connection.id}
@@ -2062,14 +2459,21 @@ export default function AdvancedInfrastructureMapper() {
                   stroke="#6b7280"
                   strokeWidth={2}
                   className="cursor-pointer hover:opacity-50"
-                  strokeDasharray={
-                    (connection.type || "dependency") === "backup"
-                      ? "5,5"
-                      : "none"
-                  }
+                  strokeDasharray={undefined}
                   onClick={(e) => {
                     e.stopPropagation();
-                    deleteConnection(connection.id);
+                    // Exit connection mode when clicking on existing connections
+                    setConnectingFrom(null);
+                  }}
+                  onDoubleClick={() => {
+                    setPendingConnection({
+                      from: connection.from,
+                      to: connection.to,
+                      id: connection.id,
+                    });
+                    setModalConnectorType(connection.connectorType);
+                    setModalNotes(connection.notes || "");
+                    setShowConnectionModal(true);
                   }}
                 />
               );
@@ -2205,6 +2609,102 @@ export default function AdvancedInfrastructureMapper() {
       <div className="hidden lg:block w-96 bg-white border-l border-gray-200 overflow-y-auto">
         {ControlPanel()}
       </div>
+
+      {/* Connection Modal */}
+      {showConnectionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded shadow-lg p-6 w-80">
+            <h2 className="text-lg font-semibold mb-4">New Connection</h2>
+            <div className="mb-3">
+              <label className="block text-xs mb-1">Connector Type</label>
+              <select
+                className="w-full border rounded px-2 py-1"
+                value={
+                  modalConnectorType === undefined ? "" : modalConnectorType
+                }
+                onChange={(e) =>
+                  setModalConnectorType(
+                    e.target.value as Connection["connectorType"]
+                  )
+                }
+              >
+                <option value="">Select type</option>
+                <option value="Produce on site">Produce on site</option>
+                <option value="Grid">Grid</option>
+                <option value="Delivery">Delivery</option>
+                <option value="Fetch">Fetch</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div className="mb-3">
+              <label className="block text-xs mb-1">Notes</label>
+              <input
+                className="w-full border rounded px-2 py-1"
+                type="text"
+                value={modalNotes}
+                onChange={(e) => setModalNotes(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-sm"
+                onClick={() => {
+                  setShowConnectionModal(false);
+                  setPendingConnection(null);
+                  setModalConnectorType(undefined);
+                  setModalNotes("");
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm"
+                disabled={!modalConnectorType}
+                onClick={() => {
+                  if (pendingConnection) {
+                    if ("id" in pendingConnection && pendingConnection.id) {
+                      // Edit existing connection
+                      setConnections((prev) =>
+                        prev.map((c) =>
+                          c.id === pendingConnection.id
+                            ? {
+                                ...c,
+                                connectorType: modalConnectorType,
+                                notes: modalNotes,
+                              }
+                            : c
+                        )
+                      );
+                    } else {
+                      // Add new connection
+                      setConnections((prev) => [
+                        ...prev,
+                        {
+                          id: `${pendingConnection.from}-${
+                            pendingConnection.to
+                          }-${Date.now()}`,
+                          from: pendingConnection.from,
+                          to: pendingConnection.to,
+                          connectorType: modalConnectorType,
+                          notes: modalNotes,
+                        },
+                      ]);
+                    }
+                  }
+                  setShowConnectionModal(false);
+                  setPendingConnection(null);
+                  setModalConnectorType(undefined);
+                  setModalNotes("");
+                }}
+              >
+                {pendingConnection && "id" in pendingConnection
+                  ? "Save Changes"
+                  : "Add Connection"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* License Modal/Sheet */}
       {showLicense && (

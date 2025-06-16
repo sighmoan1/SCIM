@@ -187,6 +187,15 @@
           "to": {
             "type": "string",
             "description": "Target element ID"
+          },
+          "connectorType": {
+            "type": "string",
+            "enum": ["Produce on site", "Grid", "Delivery", "Fetch", "Other"],
+            "description": "Type of connector"
+          },
+          "notes": {
+            "type": "string",
+            "description": "Free-text notes for the connector"
           }
         }
       }
@@ -203,6 +212,62 @@
         "exportedBy": {
           "type": "string",
           "description": "Application that exported the data"
+        }
+      }
+    },
+    "impactZones": {
+      "type": "array",
+      "description": "Custom impact zones",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "x", "y", "radius"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique impact zone identifier"
+          },
+          "name": { "type": "string", "description": "Impact zone name" },
+          "x": { "type": "number", "description": "Cartesian X coordinate" },
+          "y": { "type": "number", "description": "Cartesian Y coordinate" },
+          "radius": {
+            "type": "number",
+            "description": "Zone radius in pixels"
+          },
+          "threatId": {
+            "type": "string",
+            "description": "Associated threat ID (optional)"
+          },
+          "zIndex": {
+            "type": "number",
+            "description": "Drawing order (optional)"
+          },
+          "infrastructureProblems": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "List of infrastructure problems present in this zone"
+          },
+          "otherInfrastructureProblem": {
+            "type": "string",
+            "description": "Custom infrastructure problem if 'Other' is selected"
+          },
+          "impactEffects": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "List of likely effects in this zone"
+          },
+          "otherImpactEffect": {
+            "type": "string",
+            "description": "Custom effect if 'Other' is selected"
+          },
+          "criticality": {
+            "type": "string",
+            "enum": ["Low", "Medium", "High"],
+            "description": "Criticality or severity of the impact zone"
+          },
+          "description": {
+            "type": "string",
+            "description": "Free-text description of the impact zone"
+          }
         }
       }
     }
