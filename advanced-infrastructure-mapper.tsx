@@ -38,6 +38,12 @@ import {
   PauseCircle,
 } from "lucide-react";
 import { validateExportBeforeDownload } from "@/lib/validation";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface Point {
   x: number;
@@ -236,37 +242,37 @@ const defaultThreats: Threat[] = [
   {
     id: "1",
     name: "injury",
-    angle: 0,
+    angle: 240,
     impactRadius: 50,
   },
   {
     id: "2",
     name: "too hot",
-    angle: 60,
+    angle: 300,
     impactRadius: 40,
   },
   {
     id: "3",
     name: "too cold",
-    angle: 120,
+    angle: 0,
     impactRadius: 40,
   },
   {
     id: "4",
     name: "hunger",
-    angle: 180,
+    angle: 60,
     impactRadius: 60,
   },
   {
     id: "5",
     name: "thirst",
-    angle: 240,
+    angle: 120,
     impactRadius: 60,
   },
   {
     id: "6",
     name: "illness",
-    angle: 300,
+    angle: 180,
     impactRadius: 50,
   },
 ];
@@ -379,6 +385,100 @@ const connectionColors = {
 };
 
 const LICENSE_TEXT = `This work is licensed under the Creative Commons Attribution-Noncommercial-Share Alike 2.0 UK: England & Wales License.\nTo view a copy of this license, visit http://creativecommons.org/licenses/by-nc-sa/2.0/uk/ or send a letter to Creative Commons, 171 Second Street, Suite 300, San Francisco, California, 94105, USA.\n\nAuthors:\nMike Bennett: As founder managing director of Plain Software, Mike played a vital role in the development of NHS Direct. He is now a strategic consultant on social, business and government resilience.\nVinay Gupta: Co-editor of Small is Profitable (The Economist's book of the year 2003) and Winning the Oil Endgame, Vinay focusses on whole systems response to crisis and change mitigation.\nSTAR-TIDES: SCIM is the underlying model for the US Department of Defense STAR-TIDES project on crisis response and humanitarian relief. (see Defense Horizons #70)`;
+
+// Helper functions for tooltip content
+const formatElementMetadata = (
+  element: InfrastructureElement | ScenarioElement,
+  layer: Layer | undefined,
+  isScenario: boolean
+) => {
+  const statusInfo =
+    isScenario && "status" in element && element.status !== "normal"
+      ? `Status: ${element.status}`
+      : null;
+
+  const problems = element.infrastructureProblems?.length
+    ? element.infrastructureProblems.join(", ")
+    : null;
+
+  const customProblem = element.otherInfrastructureProblem;
+
+  return (
+    <div className="space-y-1">
+      <div className="font-semibold">{element.name}</div>
+      <div className="text-xs opacity-75">
+        <div>
+          Position: ({Math.round(element.x)}, {Math.round(element.y)})
+        </div>
+        <div>Layer: {layer?.name || element.layer}</div>
+        {element.width && element.height && (
+          <div>
+            Size: {element.width}×{element.height}
+          </div>
+        )}
+        {statusInfo && <div className="text-orange-200">{statusInfo}</div>}
+        {problems && <div>Problems: {problems}</div>}
+        {customProblem && <div>Custom: {customProblem}</div>}
+      </div>
+    </div>
+  );
+};
+
+const formatConnectionMetadata = (
+  connection: Connection | ScenarioConnection,
+  fromElement: any,
+  toElement: any,
+  isScenario: boolean
+) => {
+  const statusInfo =
+    isScenario && "status" in connection && connection.status !== "normal"
+      ? `Status: ${connection.status}`
+      : null;
+
+  return (
+    <div className="space-y-1">
+      <div className="font-semibold">Connection</div>
+      <div className="text-xs opacity-75">
+        <div>From: {fromElement.name}</div>
+        <div>To: {toElement.name}</div>
+        {connection.connectorType && (
+          <div>Type: {connection.connectorType}</div>
+        )}
+        {connection.notes && <div>Notes: {connection.notes}</div>}
+        {statusInfo && <div className="text-orange-200">{statusInfo}</div>}
+      </div>
+    </div>
+  );
+};
+
+const formatImpactZoneMetadata = (zone: ImpactZone) => {
+  return (
+    <div className="space-y-1">
+      <div className="font-semibold">{zone.name}</div>
+      <div className="text-xs opacity-75">
+        <div>
+          Position: ({Math.round(zone.x)}, {Math.round(zone.y)})
+        </div>
+        <div>Radius: {Math.round(zone.radius)}</div>
+        {zone.criticality && <div>Criticality: {zone.criticality}</div>}
+        {zone.description && <div>Description: {zone.description}</div>}
+        {zone.threatId && <div>Threat ID: {zone.threatId}</div>}
+      </div>
+    </div>
+  );
+};
+
+const formatThreatMetadata = (threat: Threat) => {
+  return (
+    <div className="space-y-1">
+      <div className="font-semibold">{threat.name}</div>
+      <div className="text-xs opacity-75">
+        <div>Angle: {Math.round(threat.angle)}°</div>
+        <div>Impact Radius: {Math.round(threat.impactRadius)}</div>
+      </div>
+    </div>
+  );
+};
 
 export default function AdvancedInfrastructureMapper() {
   const [layers, setLayers] = useState<Layer[]>(defaultLayers);
@@ -2972,851 +3072,890 @@ export default function AdvancedInfrastructureMapper() {
   };
 
   return (
-    <div className="w-full h-screen flex flex-col lg:flex-row bg-gray-50">
-      {/* Main Canvas Area */}
-      <div className="flex-1 flex flex-col min-h-0">
-        {/* Header */}
-        <div className="p-2 sm:p-4 border-b bg-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
-          <div className="flex items-center gap-2">
-            <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
-              <SheetTrigger asChild>
-                <Button variant="outline" size="sm" className="lg:hidden">
-                  <Menu className="w-4 h-4" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-full sm:w-96 p-0">
-                <div className="flex items-center justify-between p-4 border-b">
-                  <h2 className="text-lg font-semibold">Controls</h2>
-                </div>
-                {ControlPanel()}
-              </SheetContent>
-            </Sheet>
-            <h1 className="text-lg sm:text-xl font-bold">
-              Critical Infrastructure Mapper
-            </h1>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowLicense(true)}
-            >
-              View License
-            </Button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {/* Scenario Mode Toggle */}
-            {scenarios.length > 0 && (
+    <TooltipProvider delayDuration={300} skipDelayDuration={100}>
+      <div className="w-full h-screen flex flex-col lg:flex-row bg-gray-50">
+        {/* Main Canvas Area */}
+        <div className="flex-1 flex flex-col min-h-0">
+          {/* Header */}
+          <div className="p-2 sm:p-4 border-b bg-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
+            <div className="flex items-center gap-2">
+              <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="outline" size="sm" className="lg:hidden">
+                    <Menu className="w-4 h-4" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-full sm:w-96 p-0">
+                  <div className="flex items-center justify-between p-4 border-b">
+                    <h2 className="text-lg font-semibold">Controls</h2>
+                  </div>
+                  {ControlPanel()}
+                </SheetContent>
+              </Sheet>
+              <h1 className="text-lg sm:text-xl font-bold">
+                Critical Infrastructure Mapper
+              </h1>
               <Button
-                onClick={() =>
-                  scenarioMode
-                    ? deactivateScenario()
-                    : setActiveTab("scenarios")
-                }
-                variant={scenarioMode ? "default" : "outline"}
+                variant="ghost"
                 size="sm"
-                className={
-                  scenarioMode ? "bg-green-600 hover:bg-green-700" : ""
-                }
+                onClick={() => setShowLicense(true)}
               >
-                {scenarioMode ? (
-                  <PlayCircle className="w-4 h-4 sm:mr-1" />
-                ) : (
-                  <PauseCircle className="w-4 h-4 sm:mr-1" />
-                )}
-                <span className="hidden sm:inline">
-                  {scenarioMode ? "Scenario Mode" : "Scenarios"}
-                </span>
-                <span className="sm:hidden">
-                  {scenarioMode ? "Active" : "Scenario"}
-                </span>
+                View License
               </Button>
-            )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {/* Scenario Mode Toggle */}
+              {scenarios.length > 0 && (
+                <Button
+                  onClick={() =>
+                    scenarioMode
+                      ? deactivateScenario()
+                      : setActiveTab("scenarios")
+                  }
+                  variant={scenarioMode ? "default" : "outline"}
+                  size="sm"
+                  className={
+                    scenarioMode ? "bg-green-600 hover:bg-green-700" : ""
+                  }
+                >
+                  {scenarioMode ? (
+                    <PlayCircle className="w-4 h-4 sm:mr-1" />
+                  ) : (
+                    <PauseCircle className="w-4 h-4 sm:mr-1" />
+                  )}
+                  <span className="hidden sm:inline">
+                    {scenarioMode ? "Scenario Mode" : "Scenarios"}
+                  </span>
+                  <span className="sm:hidden">
+                    {scenarioMode ? "Active" : "Scenario"}
+                  </span>
+                </Button>
+              )}
 
-            <Button
-              onClick={() => setShowSegments(!showSegments)}
-              variant={showSegments ? "default" : "outline"}
-              size="sm"
-            >
-              <span className="hidden sm:inline">Segments</span>
-              <span className="sm:hidden">Seg</span>
-            </Button>
-            <Button onClick={exportData} size="sm" variant="outline">
-              <Download className="w-4 h-4 sm:mr-1" />
-              <span className="hidden sm:inline">Export</span>
-            </Button>
-            <label className="cursor-pointer">
-              <Button size="sm" variant="outline" asChild>
-                <span>
-                  <Upload className="w-4 h-4 sm:mr-1" />
-                  <span className="hidden sm:inline">Import</span>
-                </span>
+              <Button
+                onClick={() => setShowSegments(!showSegments)}
+                variant={showSegments ? "default" : "outline"}
+                size="sm"
+              >
+                <span className="hidden sm:inline">Segments</span>
+                <span className="sm:hidden">Seg</span>
               </Button>
-              <input
-                type="file"
-                accept=".json"
-                onChange={importData}
-                className="hidden"
-              />
-            </label>
+              <Button onClick={exportData} size="sm" variant="outline">
+                <Download className="w-4 h-4 sm:mr-1" />
+                <span className="hidden sm:inline">Export</span>
+              </Button>
+              <label className="cursor-pointer">
+                <Button size="sm" variant="outline" asChild>
+                  <span>
+                    <Upload className="w-4 h-4 sm:mr-1" />
+                    <span className="hidden sm:inline">Import</span>
+                  </span>
+                </Button>
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={importData}
+                  className="hidden"
+                />
+              </label>
+            </div>
           </div>
-        </div>
 
-        {/* SVG Canvas */}
-        <div ref={containerRef} className="flex-1 overflow-hidden">
-          <svg
-            ref={svgRef}
-            width={svgDimensions.width}
-            height={svgDimensions.height}
-            className="w-full h-full cursor-crosshair"
-            viewBox={`0 0 ${svgDimensions.width} ${svgDimensions.height}`}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onClick={(e) => {
-              // Always clear connection mode when clicking anywhere except on infrastructure elements
-              // This will be overridden by e.stopPropagation() in handleElementClick
-              setSelectedElement(null);
-              setSelectedImpactZone(null);
-              setConnectingFrom(null);
-            }}
-          >
-            <defs>
-              <filter id="glow">
-                <feGaussianBlur stdDeviation="3" result="coloredBlur" />
-                <feMerge>
-                  <feMergeNode in="coloredBlur" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
-              </filter>
-            </defs>
+          {/* SVG Canvas */}
+          <div ref={containerRef} className="flex-1 overflow-hidden">
+            <svg
+              ref={svgRef}
+              width={svgDimensions.width}
+              height={svgDimensions.height}
+              className="w-full h-full cursor-crosshair"
+              viewBox={`0 0 ${svgDimensions.width} ${svgDimensions.height}`}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onClick={(e) => {
+                // Always clear connection mode when clicking anywhere except on infrastructure elements
+                // This will be overridden by e.stopPropagation() in handleElementClick
+                setSelectedElement(null);
+                setSelectedImpactZone(null);
+                setConnectingFrom(null);
+              }}
+            >
+              <defs>
+                <filter id="glow">
+                  <feGaussianBlur stdDeviation="3" result="coloredBlur" />
+                  <feMerge>
+                    <feMergeNode in="coloredBlur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
 
-            {/* Threat segments */}
-            {showSegments &&
-              threatSegments.map((segment, index) => {
-                const labelPos = getSegmentLabelPosition(
-                  segment.startAngle,
-                  segment.endAngle
-                );
+              {/* Threat segments */}
+              {showSegments &&
+                threatSegments.map((segment, index) => {
+                  const labelPos = getSegmentLabelPosition(
+                    segment.startAngle,
+                    segment.endAngle
+                  );
+                  return (
+                    <Tooltip key={`segment-${index}`}>
+                      <TooltipTrigger asChild>
+                        <g>
+                          <path
+                            d={createSegmentPath(
+                              segment.startAngle,
+                              segment.endAngle,
+                              0,
+                              actualMaxRadius
+                            )}
+                            fill="#ef4444"
+                            fillOpacity={0.1}
+                            stroke="#ef4444"
+                            strokeWidth={1}
+                            strokeOpacity={0.3}
+                          />
+                          {/* Radial lines */}
+                          <line
+                            x1={centerX}
+                            y1={centerY}
+                            x2={
+                              centerX +
+                              Math.cos((segment.startAngle * Math.PI) / 180) *
+                                actualMaxRadius
+                            }
+                            y2={
+                              centerY +
+                              Math.sin((segment.startAngle * Math.PI) / 180) *
+                                actualMaxRadius
+                            }
+                            stroke="#374151"
+                            strokeWidth={1}
+                            strokeOpacity={0.4}
+                          />
+                          {/* Draggable handle at the end of the radial line */}
+                          <circle
+                            cx={
+                              centerX +
+                              Math.cos((segment.startAngle * Math.PI) / 180) *
+                                actualMaxRadius
+                            }
+                            cy={
+                              centerY +
+                              Math.sin((segment.startAngle * Math.PI) / 180) *
+                                actualMaxRadius
+                            }
+                            r={8}
+                            fill="#ef4444"
+                            stroke="white"
+                            strokeWidth={2}
+                            className="cursor-pointer hover:fill-red-600"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              // Exit connection mode when clicking on threat segments
+                              setConnectingFrom(null);
+                            }}
+                            onMouseDown={(e) =>
+                              handleSegmentMouseDown(segment.threat.id, e)
+                            }
+                          />
+                          {/* Segment label */}
+                          <text
+                            x={labelPos.x}
+                            y={labelPos.y}
+                            textAnchor="middle"
+                            dominantBaseline="middle"
+                            className="text-sm font-bold fill-gray-900 pointer-events-none select-none"
+                            style={{
+                              userSelect: "none",
+                            }}
+                          >
+                            {segment.threat.name}
+                          </text>
+                        </g>
+                      </TooltipTrigger>
+                      <TooltipContent
+                        side="top"
+                        align="center"
+                        className="max-w-xs p-3 text-sm bg-gray-900 text-white rounded-lg shadow-lg"
+                      >
+                        <div className="space-y-1">
+                          {formatThreatMetadata(segment.threat)}
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+
+              {/* Concentric circles for layers */}
+              {scaledLayers.map((layer) => {
+                const isHovered = hoveredLayerId === layer.id;
                 return (
-                  <g key={`segment-${index}`}>
-                    <path
-                      d={createSegmentPath(
-                        segment.startAngle,
-                        segment.endAngle,
-                        0,
-                        actualMaxRadius
-                      )}
-                      fill="#ef4444"
-                      fillOpacity={0.1}
-                      stroke="#ef4444"
-                      strokeWidth={1}
-                      strokeOpacity={0.3}
-                    />
-                    {/* Radial lines */}
-                    <line
-                      x1={centerX}
-                      y1={centerY}
-                      x2={
-                        centerX +
-                        Math.cos((segment.startAngle * Math.PI) / 180) *
-                          actualMaxRadius
-                      }
-                      y2={
-                        centerY +
-                        Math.sin((segment.startAngle * Math.PI) / 180) *
-                          actualMaxRadius
-                      }
-                      stroke="#374151"
-                      strokeWidth={1}
-                      strokeOpacity={0.4}
-                    />
-                    {/* Draggable handle at the end of the radial line */}
-                    <circle
-                      cx={
-                        centerX +
-                        Math.cos((segment.startAngle * Math.PI) / 180) *
-                          actualMaxRadius
-                      }
-                      cy={
-                        centerY +
-                        Math.sin((segment.startAngle * Math.PI) / 180) *
-                          actualMaxRadius
-                      }
-                      r={8}
-                      fill="#ef4444"
-                      stroke="white"
-                      strokeWidth={2}
-                      className="cursor-pointer hover:fill-red-600"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        // Exit connection mode when clicking on threat segments
-                        setConnectingFrom(null);
-                      }}
-                      onMouseDown={(e) =>
-                        handleSegmentMouseDown(segment.threat.id, e)
-                      }
-                    />
-                    {/* Segment label */}
-                    <text
-                      x={labelPos.x}
-                      y={labelPos.y}
-                      textAnchor="middle"
-                      dominantBaseline="middle"
-                      className="text-sm font-bold fill-gray-900 pointer-events-none select-none"
-                      style={{
-                        userSelect: "none",
-                      }}
-                    >
-                      {segment.threat.name}
-                    </text>
-                  </g>
+                  <circle
+                    key={layer.id}
+                    cx={centerX}
+                    cy={centerY}
+                    r={layer.radius}
+                    fill={isHovered ? layer.color : "none"}
+                    fillOpacity={isHovered ? layer.opacity * 0.3 : 0}
+                    stroke={isHovered ? layer.color : "#374151"}
+                    strokeWidth={isHovered ? 3 : 1}
+                    strokeOpacity={isHovered ? 0.8 : 0.6}
+                    className={isHovered ? "animate-pulse" : ""}
+                    style={{
+                      filter: isHovered
+                        ? "drop-shadow(0 0 10px rgba(59, 130, 246, 0.5))"
+                        : "none",
+                      transition: "all 0.2s ease-in-out",
+                    }}
+                  />
                 );
               })}
 
-            {/* Concentric circles for layers */}
-            {scaledLayers.map((layer) => {
-              const isHovered = hoveredLayerId === layer.id;
-              return (
-                <circle
-                  key={layer.id}
-                  cx={centerX}
-                  cy={centerY}
-                  r={layer.radius}
-                  fill={isHovered ? layer.color : "none"}
-                  fillOpacity={isHovered ? layer.opacity * 0.3 : 0}
-                  stroke={isHovered ? layer.color : "#374151"}
-                  strokeWidth={isHovered ? 3 : 1}
-                  strokeOpacity={isHovered ? 0.8 : 0.6}
-                  className={isHovered ? "animate-pulse" : ""}
-                  style={{
-                    filter: isHovered
-                      ? "drop-shadow(0 0 10px rgba(59, 130, 246, 0.5))"
-                      : "none",
-                    transition: "all 0.2s ease-in-out",
-                  }}
-                />
-              );
-            })}
-
-            {/* Layer labels */}
-            {scaledLayers.map((layer) => {
-              const isHovered = hoveredLayerId === layer.id;
-              return (
-                <text
-                  key={`label-${layer.id}`}
-                  x={centerX}
-                  y={centerY - layer.radius + 15}
-                  textAnchor="middle"
-                  className={`text-xs sm:text-sm font-medium pointer-events-none select-none ${
-                    isHovered ? "fill-blue-600 font-bold" : "fill-gray-700"
-                  }`}
-                  style={{
-                    userSelect: "none",
-                    filter: isHovered
-                      ? "drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3))"
-                      : "none",
-                    transition: "all 0.2s ease-in-out",
-                  }}
-                >
-                  {layer.name}
-                </text>
-              );
-            })}
-
-            {/* Custom Impact Zones */}
-            {currentImpactZones.map((zone) => {
-              const isSelected = selectedImpactZone === zone.id;
-
-              return (
-                <g key={`custom-impact-${zone.id}`}>
-                  {/* Main impact zone circle */}
-                  <circle
-                    cx={zone.x}
-                    cy={zone.y}
-                    r={zone.radius}
-                    fill="#3b82f6"
-                    fillOpacity={0.15}
-                    stroke={isSelected ? "#3b82f6" : "#3b82f6"}
-                    strokeWidth={isSelected ? 3 : 2}
-                    strokeOpacity={0.7}
-                    strokeDasharray="5,5"
-                    className="cursor-move hover:stroke-blue-600"
-                    onMouseDown={(e) => handleImpactZoneMouseDown(zone.id, e)}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedImpactZone(zone.id);
-                      // Exit connection mode when clicking on impact zones
-                      setConnectingFrom(null);
-                    }}
-                  />
-
-                  {/* Impact zone label */}
+              {/* Layer labels */}
+              {scaledLayers.map((layer) => {
+                const isHovered = hoveredLayerId === layer.id;
+                return (
                   <text
-                    x={zone.x}
-                    y={zone.y}
+                    key={`label-${layer.id}`}
+                    x={centerX}
+                    y={centerY - layer.radius + 15}
                     textAnchor="middle"
-                    dominantBaseline="middle"
-                    className="text-sm font-medium fill-blue-700 pointer-events-none select-none"
-                    style={{ userSelect: "none" }}
+                    className={`text-xs sm:text-sm font-medium pointer-events-none select-none ${
+                      isHovered ? "fill-blue-600 font-bold" : "fill-gray-700"
+                    }`}
+                    style={{
+                      userSelect: "none",
+                      filter: isHovered
+                        ? "drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3))"
+                        : "none",
+                      transition: "all 0.2s ease-in-out",
+                    }}
                   >
-                    {zone.name}
+                    {layer.name}
                   </text>
+                );
+              })}
 
-                  {/* Resize handle - only show when selected */}
-                  {isSelected && (
-                    <circle
-                      cx={zone.x + zone.radius - 10}
-                      cy={zone.y}
-                      r={6}
-                      fill="#3b82f6"
-                      stroke="white"
-                      strokeWidth={2}
-                      className="cursor-pointer hover:fill-blue-700"
-                      onMouseDown={(e) =>
-                        handleImpactZoneResizeMouseDown(zone.id, e)
-                      }
-                    />
-                  )}
-                </g>
-              );
-            })}
+              {/* Custom Impact Zones */}
+              {currentImpactZones.map((zone) => {
+                const isSelected = selectedImpactZone === zone.id;
 
-            {/* Connections */}
-            {currentConnections.map((connection) => {
-              const fromElement = scaledElements.find(
-                (el) => el.id === connection.from
-              );
-              const toElement = scaledElements.find(
-                (el) => el.id === connection.to
-              );
-              if (!fromElement || !toElement) return null;
+                return (
+                  <Tooltip key={`custom-impact-${zone.id}`}>
+                    <TooltipTrigger asChild>
+                      <g>
+                        {/* Main impact zone circle */}
+                        <circle
+                          cx={zone.x}
+                          cy={zone.y}
+                          r={zone.radius}
+                          fill="#3b82f6"
+                          fillOpacity={0.15}
+                          stroke={isSelected ? "#3b82f6" : "#3b82f6"}
+                          strokeWidth={isSelected ? 3 : 2}
+                          strokeOpacity={0.7}
+                          strokeDasharray="5,5"
+                          className="cursor-move hover:stroke-blue-600"
+                          onMouseDown={(e) =>
+                            handleImpactZoneMouseDown(zone.id, e)
+                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedImpactZone(zone.id);
+                            // Exit connection mode when clicking on impact zones
+                            setConnectingFrom(null);
+                          }}
+                        />
 
-              // Scenario-specific styling
-              const isScenarioConnection =
-                scenarioMode && "status" in connection;
-              const connectionStatus = isScenarioConnection
-                ? connection.status
-                : "normal";
+                        {/* Impact zone label */}
+                        <text
+                          x={zone.x}
+                          y={zone.y}
+                          textAnchor="middle"
+                          dominantBaseline="middle"
+                          className="text-sm font-medium fill-blue-700 pointer-events-none select-none"
+                          style={{ userSelect: "none" }}
+                        >
+                          {zone.name}
+                        </text>
 
-              let strokeColor = "#6b7280";
-              let strokeWidth = 2;
-              let strokeDasharray = undefined;
-              let opacity = 1;
+                        {/* Resize handle - only show when selected */}
+                        {isSelected && (
+                          <circle
+                            cx={zone.x + zone.radius - 10}
+                            cy={zone.y}
+                            r={6}
+                            fill="#3b82f6"
+                            stroke="white"
+                            strokeWidth={2}
+                            className="cursor-pointer hover:fill-blue-700"
+                            onMouseDown={(e) =>
+                              handleImpactZoneResizeMouseDown(zone.id, e)
+                            }
+                          />
+                        )}
+                      </g>
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="top"
+                      align="center"
+                      className="max-w-xs p-3 text-sm bg-gray-900 text-white rounded-lg shadow-lg"
+                    >
+                      <div className="space-y-1">
+                        {formatImpactZoneMetadata(zone)}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
 
-              if (isScenarioConnection) {
-                switch (connectionStatus) {
-                  case "failed":
-                    strokeColor = "#ef4444";
-                    strokeDasharray = "5,5";
-                    opacity = 0.7;
-                    break;
-                  case "new":
-                    strokeColor = "#10b981";
-                    strokeWidth = 3;
-                    break;
-                  default:
-                    strokeColor = "#6b7280";
+              {/* Connections */}
+              {currentConnections.map((connection) => {
+                const fromElement = scaledElements.find(
+                  (el) => el.id === connection.from
+                );
+                const toElement = scaledElements.find(
+                  (el) => el.id === connection.to
+                );
+                if (!fromElement || !toElement) return null;
+
+                // Scenario-specific styling
+                const isScenarioConnection =
+                  scenarioMode && "status" in connection;
+                const connectionStatus = isScenarioConnection
+                  ? connection.status
+                  : "normal";
+
+                let strokeColor = "#6b7280";
+                let strokeWidth = 2;
+                let strokeDasharray = undefined;
+                let opacity = 1;
+
+                if (isScenarioConnection) {
+                  switch (connectionStatus) {
+                    case "failed":
+                      strokeColor = "#ef4444";
+                      strokeDasharray = "5,5";
+                      opacity = 0.7;
+                      break;
+                    case "new":
+                      strokeColor = "#10b981";
+                      strokeWidth = 3;
+                      break;
+                    default:
+                      strokeColor = "#6b7280";
+                  }
                 }
-              }
 
-              return (
-                <g key={connection.id}>
-                  <line
-                    x1={fromElement.x}
-                    y1={fromElement.y}
-                    x2={toElement.x}
-                    y2={toElement.y}
-                    stroke={strokeColor}
-                    strokeWidth={strokeWidth}
-                    strokeDasharray={strokeDasharray}
-                    opacity={opacity}
-                    className="cursor-pointer hover:opacity-50"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      // Exit connection mode when clicking on existing connections
-                      setConnectingFrom(null);
-                    }}
-                    onDoubleClick={() => {
-                      setPendingConnection({
-                        from: connection.from,
-                        to: connection.to,
-                        id: connection.id,
-                      });
-                      setModalConnectorType(connection.connectorType);
-                      setModalNotes(connection.notes || "");
-                      setModalImpactEffects(connection.impactEffects || []);
-                      setModalOtherImpactEffect(
-                        connection.otherImpactEffect || ""
-                      );
-                      setShowConnectionModal(true);
-                    }}
-                  />
-                  {/* Cross-out line for failed connections */}
-                  {isScenarioConnection && connectionStatus === "failed" && (
-                    <line
-                      x1={fromElement.x - 10}
-                      y1={fromElement.y - 10}
-                      x2={toElement.x + 10}
-                      y2={toElement.y + 10}
-                      stroke="#ef4444"
-                      strokeWidth={2}
-                      opacity={0.8}
-                      className="pointer-events-none"
-                    />
-                  )}
-                  {/* Status indicator for scenario connections */}
-                  {isScenarioConnection && connectionStatus !== "normal" && (
-                    <circle
-                      cx={(fromElement.x + toElement.x) / 2}
-                      cy={(fromElement.y + toElement.y) / 2}
-                      r={6}
-                      fill={
-                        connectionStatus === "failed" ? "#ef4444" : "#10b981"
-                      }
-                      stroke="white"
-                      strokeWidth={2}
-                      className="pointer-events-none"
-                    />
-                  )}
-                </g>
-              );
-            })}
+                return (
+                  <Tooltip key={connection.id}>
+                    <TooltipTrigger asChild>
+                      <g>
+                        <line
+                          x1={fromElement.x}
+                          y1={fromElement.y}
+                          x2={toElement.x}
+                          y2={toElement.y}
+                          stroke={strokeColor}
+                          strokeWidth={strokeWidth}
+                          strokeDasharray={strokeDasharray}
+                          opacity={opacity}
+                          className="cursor-pointer hover:opacity-50"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // Exit connection mode when clicking on existing connections
+                            setConnectingFrom(null);
+                          }}
+                          onDoubleClick={() => {
+                            setPendingConnection({
+                              from: connection.from,
+                              to: connection.to,
+                              id: connection.id,
+                            });
+                            setModalConnectorType(connection.connectorType);
+                            setModalNotes(connection.notes || "");
+                            setModalImpactEffects(
+                              connection.impactEffects || []
+                            );
+                            setModalOtherImpactEffect(
+                              connection.otherImpactEffect || ""
+                            );
+                            setShowConnectionModal(true);
+                          }}
+                        />
+                        {/* Cross-out line for failed connections */}
+                        {isScenarioConnection &&
+                          connectionStatus === "failed" && (
+                            <line
+                              x1={fromElement.x - 10}
+                              y1={fromElement.y - 10}
+                              x2={toElement.x + 10}
+                              y2={toElement.y + 10}
+                              stroke="#ef4444"
+                              strokeWidth={2}
+                              opacity={0.8}
+                              className="pointer-events-none"
+                            />
+                          )}
+                        {/* Status indicator for scenario connections */}
+                        {isScenarioConnection &&
+                          connectionStatus !== "normal" && (
+                            <circle
+                              cx={(fromElement.x + toElement.x) / 2}
+                              cy={(fromElement.y + toElement.y) / 2}
+                              r={6}
+                              fill={
+                                connectionStatus === "failed"
+                                  ? "#ef4444"
+                                  : "#10b981"
+                              }
+                              stroke="white"
+                              strokeWidth={2}
+                              className="pointer-events-none"
+                            />
+                          )}
+                      </g>
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="top"
+                      align="center"
+                      className="max-w-xs p-3 text-sm bg-gray-900 text-white rounded-lg shadow-lg"
+                    >
+                      <div className="space-y-1">
+                        {formatConnectionMetadata(
+                          connection,
+                          fromElement,
+                          toElement,
+                          isScenarioConnection
+                        )}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
 
-            {/* Infrastructure elements */}
-            {scaledElements.map((element) => {
-              const isSelected = selectedElement === element.id;
-              const isConnecting = connectingFrom === element.id;
-              const originalElement = currentElements.find(
-                (e) => e.id === element.id
-              );
-              const elementWidth = originalElement?.width || 80;
-              const elementHeight = originalElement?.height || 30;
+              {/* Infrastructure elements */}
+              {scaledElements.map((element) => {
+                const isSelected = selectedElement === element.id;
+                const isConnecting = connectingFrom === element.id;
+                const originalElement = currentElements.find(
+                  (e) => e.id === element.id
+                );
+                const elementWidth = originalElement?.width || 80;
+                const elementHeight = originalElement?.height || 30;
 
-              // Scenario-specific styling
-              const isScenarioElement = scenarioMode && "status" in element;
-              const elementStatus = isScenarioElement
-                ? element.status
-                : "normal";
+                // Scenario-specific styling
+                const isScenarioElement = scenarioMode && "status" in element;
+                const elementStatus = isScenarioElement
+                  ? element.status
+                  : "normal";
 
-              let fillColor = "white";
-              let strokeColor = "#65a30d";
-              let opacity = 1;
-              let strokeDasharray = undefined;
+                let fillColor = "white";
+                let strokeColor = "#65a30d";
+                let opacity = 1;
+                let strokeDasharray = undefined;
 
-              if (isScenarioElement) {
-                switch (elementStatus) {
-                  case "degraded":
-                    fillColor = "#fef3c7";
-                    strokeColor = "#f59e0b";
-                    strokeDasharray = "3,2";
-                    break;
-                  case "destroyed":
-                    fillColor = "#fee2e2";
-                    strokeColor = "#ef4444";
-                    opacity = 0.7;
-                    strokeDasharray = "5,5";
-                    break;
-                  case "new":
-                    fillColor = "#d1fae5";
-                    strokeColor = "#10b981";
-                    break;
-                  default:
-                    fillColor = "white";
-                    strokeColor = "#65a30d";
+                if (isScenarioElement) {
+                  switch (elementStatus) {
+                    case "degraded":
+                      fillColor = "#fef3c7";
+                      strokeColor = "#f59e0b";
+                      strokeDasharray = "3,2";
+                      break;
+                    case "destroyed":
+                      fillColor = "#fee2e2";
+                      strokeColor = "#ef4444";
+                      opacity = 0.7;
+                      strokeDasharray = "5,5";
+                      break;
+                    case "new":
+                      fillColor = "#d1fae5";
+                      strokeColor = "#10b981";
+                      break;
+                    default:
+                      fillColor = "white";
+                      strokeColor = "#65a30d";
+                  }
                 }
-              }
 
-              // Override stroke color for selection/connection states
-              if (isSelected) {
-                strokeColor = "#ef4444";
-              } else if (isConnecting) {
-                strokeColor = "#3b82f6";
-              }
+                // Override stroke color for selection/connection states
+                if (isSelected) {
+                  strokeColor = "#ef4444";
+                } else if (isConnecting) {
+                  strokeColor = "#3b82f6";
+                }
 
-              // Get wrapped text lines
-              const textLines = wrapText(element.name, elementWidth - 8, 10);
-              const lineHeight = 12;
-              const totalTextHeight = textLines.length * lineHeight;
-              const textStartY =
-                element.y - totalTextHeight / 2 + lineHeight / 2;
+                // Get wrapped text lines
+                const textLines = wrapText(element.name, elementWidth - 8, 10);
+                const lineHeight = 12;
+                const totalTextHeight = textLines.length * lineHeight;
+                const textStartY =
+                  element.y - totalTextHeight / 2 + lineHeight / 2;
 
-              return (
-                <g key={element.id}>
-                  {/* Main element rectangle */}
-                  <rect
-                    x={element.x - elementWidth / 2}
-                    y={element.y - elementHeight / 2}
-                    width={elementWidth}
-                    height={elementHeight}
-                    rx={6}
-                    fill={fillColor}
-                    stroke={strokeColor}
-                    strokeWidth={isSelected || isConnecting ? 3 : 2}
-                    strokeDasharray={strokeDasharray}
-                    opacity={opacity}
-                    className="cursor-move hover:stroke-blue-500"
-                    filter="none"
-                    onMouseDown={(e) => handleMouseDown(element.id, e)}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleElementClick(element.id);
-                    }}
-                    onDoubleClick={(e) => {
-                      e.stopPropagation();
-                      const currentElement = currentElements.find(
-                        (e) => e.id === element.id
-                      );
-                      if (currentElement) {
-                        setPendingElement({
-                          id: element.id,
-                          name: element.name,
-                        });
-                        setModalInfrastructureProblems(
-                          currentElement.infrastructureProblems || []
-                        );
-                        setModalOtherInfrastructureProblem(
-                          currentElement.otherInfrastructureProblem || ""
-                        );
-                        setShowElementModal(true);
-                      }
-                    }}
-                  />
+                const elementLayer = scaledLayers.find(
+                  (l) => l.id === element.layer.toString()
+                );
 
-                  {/* Status indicator for scenario elements */}
-                  {isScenarioElement && elementStatus !== "normal" && (
-                    <circle
-                      cx={element.x + elementWidth / 2 - 8}
-                      cy={element.y - elementHeight / 2 + 8}
-                      r={4}
-                      fill={
-                        elementStatus === "destroyed"
-                          ? "#ef4444"
-                          : elementStatus === "degraded"
-                          ? "#f59e0b"
-                          : elementStatus === "new"
-                          ? "#10b981"
-                          : "#6b7280"
-                      }
-                      stroke="white"
-                      strokeWidth={1}
-                      className="pointer-events-none"
-                    />
-                  )}
+                return (
+                  <Tooltip key={element.id}>
+                    <TooltipTrigger asChild>
+                      <g>
+                        {/* Main element rectangle */}
+                        <rect
+                          x={element.x - elementWidth / 2}
+                          y={element.y - elementHeight / 2}
+                          width={elementWidth}
+                          height={elementHeight}
+                          rx={6}
+                          fill={fillColor}
+                          stroke={strokeColor}
+                          strokeWidth={isSelected || isConnecting ? 3 : 2}
+                          strokeDasharray={strokeDasharray}
+                          opacity={opacity}
+                          className="cursor-move hover:stroke-blue-500"
+                          filter="none"
+                          onMouseDown={(e) => handleMouseDown(element.id, e)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleElementClick(element.id);
+                          }}
+                          onDoubleClick={(e) => {
+                            e.stopPropagation();
+                            const currentElement = currentElements.find(
+                              (e) => e.id === element.id
+                            );
+                            if (currentElement) {
+                              setPendingElement({
+                                id: element.id,
+                                name: element.name,
+                              });
+                              setModalInfrastructureProblems(
+                                currentElement.infrastructureProblems || []
+                              );
+                              setModalOtherInfrastructureProblem(
+                                currentElement.otherInfrastructureProblem || ""
+                              );
+                              setShowElementModal(true);
+                            }
+                          }}
+                        />
 
-                  {/* Destroyed element overlay */}
-                  {isScenarioElement && elementStatus === "destroyed" && (
-                    <>
-                      <line
-                        x1={element.x - elementWidth / 2}
-                        y1={element.y - elementHeight / 2}
-                        x2={element.x + elementWidth / 2}
-                        y2={element.y + elementHeight / 2}
-                        stroke="#ef4444"
-                        strokeWidth={3}
-                        opacity={0.8}
-                        className="pointer-events-none"
-                      />
-                      <line
-                        x1={element.x + elementWidth / 2}
-                        y1={element.y - elementHeight / 2}
-                        x2={element.x - elementWidth / 2}
-                        y2={element.y + elementHeight / 2}
-                        stroke="#ef4444"
-                        strokeWidth={3}
-                        opacity={0.8}
-                        className="pointer-events-none"
-                      />
-                    </>
-                  )}
+                        {/* Status indicator for scenario elements */}
+                        {isScenarioElement && elementStatus !== "normal" && (
+                          <circle
+                            cx={element.x + elementWidth / 2 - 8}
+                            cy={element.y - elementHeight / 2 + 8}
+                            r={4}
+                            fill={
+                              elementStatus === "destroyed"
+                                ? "#ef4444"
+                                : elementStatus === "degraded"
+                                ? "#f59e0b"
+                                : elementStatus === "new"
+                                ? "#10b981"
+                                : "#6b7280"
+                            }
+                            stroke="white"
+                            strokeWidth={1}
+                            className="pointer-events-none"
+                          />
+                        )}
 
-                  {/* Wrapped text */}
-                  <text
-                    className="text-xs font-medium fill-gray-800 pointer-events-none select-none"
-                    style={{ userSelect: "none" }}
-                  >
-                    {textLines.map((line, index) => (
-                      <tspan
-                        key={index}
-                        x={element.x}
-                        y={textStartY + index * lineHeight}
-                        textAnchor="middle"
-                      >
-                        {line}
-                      </tspan>
-                    ))}
-                  </text>
+                        {/* Destroyed element overlay */}
+                        {isScenarioElement && elementStatus === "destroyed" && (
+                          <>
+                            <line
+                              x1={element.x - elementWidth / 2}
+                              y1={element.y - elementHeight / 2}
+                              x2={element.x + elementWidth / 2}
+                              y2={element.y + elementHeight / 2}
+                              stroke="#ef4444"
+                              strokeWidth={3}
+                              opacity={0.8}
+                              className="pointer-events-none"
+                            />
+                            <line
+                              x1={element.x + elementWidth / 2}
+                              y1={element.y - elementHeight / 2}
+                              x2={element.x - elementWidth / 2}
+                              y2={element.y + elementHeight / 2}
+                              stroke="#ef4444"
+                              strokeWidth={3}
+                              opacity={0.8}
+                              className="pointer-events-none"
+                            />
+                          </>
+                        )}
 
-                  {/* Resize handles - only show when selected */}
-                  {isSelected && (
-                    <>
-                      {/* Southeast handle */}
-                      <circle
-                        cx={element.x + elementWidth / 2 - 3}
-                        cy={element.y + elementHeight / 2 - 3}
-                        r={4}
-                        fill="#ef4444"
-                        stroke="white"
-                        strokeWidth={1}
-                        className="cursor-se-resize"
-                        onMouseDown={(e) =>
-                          handleResizeMouseDown(element.id, "se", e)
-                        }
-                      />
+                        {/* Wrapped text */}
+                        <text
+                          className="text-xs font-medium fill-gray-800 pointer-events-none select-none"
+                          style={{ userSelect: "none" }}
+                        >
+                          {textLines.map((line, index) => (
+                            <tspan
+                              key={index}
+                              x={element.x}
+                              y={textStartY + index * lineHeight}
+                              textAnchor="middle"
+                            >
+                              {line}
+                            </tspan>
+                          ))}
+                        </text>
 
-                      {/* Southwest handle */}
-                      <circle
-                        cx={element.x - elementWidth / 2 + 3}
-                        cy={element.y + elementHeight / 2 - 3}
-                        r={4}
-                        fill="#ef4444"
-                        stroke="white"
-                        strokeWidth={1}
-                        className="cursor-sw-resize"
-                        onMouseDown={(e) =>
-                          handleResizeMouseDown(element.id, "sw", e)
-                        }
-                      />
+                        {/* Resize handles - only show when selected */}
+                        {isSelected && (
+                          <>
+                            {/* Southeast handle */}
+                            <circle
+                              cx={element.x + elementWidth / 2 - 3}
+                              cy={element.y + elementHeight / 2 - 3}
+                              r={4}
+                              fill="#ef4444"
+                              stroke="white"
+                              strokeWidth={1}
+                              className="cursor-se-resize"
+                              onMouseDown={(e) =>
+                                handleResizeMouseDown(element.id, "se", e)
+                              }
+                            />
 
-                      {/* Northeast handle */}
-                      <circle
-                        cx={element.x + elementWidth / 2 - 3}
-                        cy={element.y - elementHeight / 2 + 3}
-                        r={4}
-                        fill="#ef4444"
-                        stroke="white"
-                        strokeWidth={1}
-                        className="cursor-ne-resize"
-                        onMouseDown={(e) =>
-                          handleResizeMouseDown(element.id, "ne", e)
-                        }
-                      />
+                            {/* Southwest handle */}
+                            <circle
+                              cx={element.x - elementWidth / 2 + 3}
+                              cy={element.y + elementHeight / 2 - 3}
+                              r={4}
+                              fill="#ef4444"
+                              stroke="white"
+                              strokeWidth={1}
+                              className="cursor-sw-resize"
+                              onMouseDown={(e) =>
+                                handleResizeMouseDown(element.id, "sw", e)
+                              }
+                            />
 
-                      {/* Northwest handle */}
-                      <circle
-                        cx={element.x - elementWidth / 2 + 3}
-                        cy={element.y - elementHeight / 2 + 3}
-                        r={4}
-                        fill="#ef4444"
-                        stroke="white"
-                        strokeWidth={1}
-                        className="cursor-nw-resize"
-                        onMouseDown={(e) =>
-                          handleResizeMouseDown(element.id, "nw", e)
-                        }
-                      />
-                    </>
-                  )}
-                </g>
-              );
-            })}
-          </svg>
+                            {/* Northeast handle */}
+                            <circle
+                              cx={element.x + elementWidth / 2 - 3}
+                              cy={element.y - elementHeight / 2 + 3}
+                              r={4}
+                              fill="#ef4444"
+                              stroke="white"
+                              strokeWidth={1}
+                              className="cursor-ne-resize"
+                              onMouseDown={(e) =>
+                                handleResizeMouseDown(element.id, "ne", e)
+                              }
+                            />
+
+                            {/* Northwest handle */}
+                            <circle
+                              cx={element.x - elementWidth / 2 + 3}
+                              cy={element.y - elementHeight / 2 + 3}
+                              r={4}
+                              fill="#ef4444"
+                              stroke="white"
+                              strokeWidth={1}
+                              className="cursor-nw-resize"
+                              onMouseDown={(e) =>
+                                handleResizeMouseDown(element.id, "nw", e)
+                              }
+                            />
+                          </>
+                        )}
+                      </g>
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="top"
+                      align="center"
+                      className="max-w-xs p-3 text-sm bg-gray-900 text-white rounded-lg shadow-lg"
+                    >
+                      <div className="space-y-1">
+                        {formatElementMetadata(
+                          originalElement || element,
+                          elementLayer,
+                          isScenarioElement
+                        )}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
+            </svg>
+          </div>
         </div>
-      </div>
 
-      {/* Desktop Sidebar */}
-      <div className="hidden lg:block w-96 bg-white border-l border-gray-200 overflow-y-auto">
-        {ControlPanel()}
-      </div>
+        {/* Desktop Sidebar */}
+        <div className="hidden lg:block w-96 bg-white border-l border-gray-200 overflow-y-auto">
+          {ControlPanel()}
+        </div>
 
-      {/* Connection Modal */}
-      {showConnectionModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40"
-          onClick={(e) => {
-            // Close modal when clicking on backdrop
-            if (e.target === e.currentTarget) {
-              setShowConnectionModal(false);
-              setPendingConnection(null);
-              setModalConnectorType(undefined);
-              setModalNotes("");
-            }
-          }}
-        >
+        {/* Connection Modal */}
+        {showConnectionModal && (
           <div
-            className="bg-white rounded shadow-lg p-6 w-80"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40"
             onClick={(e) => {
-              // Prevent clicks inside modal from bubbling up
-              e.stopPropagation();
+              // Close modal when clicking on backdrop
+              if (e.target === e.currentTarget) {
+                setShowConnectionModal(false);
+                setPendingConnection(null);
+                setModalConnectorType(undefined);
+                setModalNotes("");
+              }
             }}
           >
-            <h2 className="text-lg font-semibold mb-4">New Connection</h2>
-            <div className="mb-3">
-              <label className="block text-xs mb-1">Connector Type</label>
-              <select
-                className="w-full border rounded px-2 py-1"
-                value={
-                  modalConnectorType === undefined ? "" : modalConnectorType
-                }
-                onChange={(e) =>
-                  setModalConnectorType(
-                    e.target.value as Connection["connectorType"]
-                  )
-                }
-                onClick={(e) => e.stopPropagation()}
-              >
-                <option value="">Select type</option>
-                <option value="Produce on site">Produce on site</option>
-                <option value="Grid">Grid</option>
-                <option value="Delivery">Delivery</option>
-                <option value="Fetch">Fetch</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
-            <div className="mb-3">
-              <label className="block text-xs mb-1">Notes</label>
-              <input
-                className="w-full border rounded px-2 py-1"
-                type="text"
-                value={modalNotes}
-                onChange={(e) => setModalNotes(e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-              />
-            </div>
-            <div className="mb-3">
-              <label className="block text-xs mb-1">Degradations</label>
-              <div className="max-h-32 overflow-y-auto space-y-1">
-                {IMPACT_EFFECTS.map((effect) => (
-                  <label
-                    key={effect}
-                    className="flex items-center gap-2 text-xs"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={modalImpactEffects.includes(effect)}
-                      onChange={() => {
-                        setModalImpactEffects((prev) =>
-                          prev.includes(effect)
-                            ? prev.filter((e) => e !== effect)
-                            : [...prev, effect]
-                        );
-                      }}
-                    />
-                    {effect}
-                  </label>
-                ))}
+            <div
+              className="bg-white rounded shadow-lg p-6 w-80"
+              onClick={(e) => {
+                // Prevent clicks inside modal from bubbling up
+                e.stopPropagation();
+              }}
+            >
+              <h2 className="text-lg font-semibold mb-4">New Connection</h2>
+              <div className="mb-3">
+                <label className="block text-xs mb-1">Connector Type</label>
+                <select
+                  className="w-full border rounded px-2 py-1"
+                  value={
+                    modalConnectorType === undefined ? "" : modalConnectorType
+                  }
+                  onChange={(e) =>
+                    setModalConnectorType(
+                      e.target.value as Connection["connectorType"]
+                    )
+                  }
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <option value="">Select type</option>
+                  <option value="Produce on site">Produce on site</option>
+                  <option value="Grid">Grid</option>
+                  <option value="Delivery">Delivery</option>
+                  <option value="Fetch">Fetch</option>
+                  <option value="Other">Other</option>
+                </select>
               </div>
-              {modalImpactEffects.includes("Other (please specify)") && (
+              <div className="mb-3">
+                <label className="block text-xs mb-1">Notes</label>
                 <input
-                  className="w-full border rounded px-2 py-1 mt-2"
+                  className="w-full border rounded px-2 py-1"
                   type="text"
-                  placeholder="Please specify other effect"
-                  value={modalOtherImpactEffect}
-                  onChange={(e) => setModalOtherImpactEffect(e.target.value)}
+                  value={modalNotes}
+                  onChange={(e) => setModalNotes(e.target.value)}
                   onClick={(e) => e.stopPropagation()}
                 />
-              )}
-            </div>
-            <div className="flex justify-end gap-2">
-              <button
-                className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowConnectionModal(false);
-                  setPendingConnection(null);
-                  setModalConnectorType(undefined);
-                  setModalNotes("");
-                  setModalImpactEffects([]);
-                  setModalOtherImpactEffect("");
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm"
-                disabled={!modalConnectorType}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (pendingConnection) {
-                    if ("id" in pendingConnection && pendingConnection.id) {
-                      // Edit existing connection
-                      if (scenarioMode && activeScenario) {
-                        // Edit connection in active scenario
-                        setScenarios((prev) =>
-                          prev.map((scenario) =>
-                            scenario.id === activeScenario
-                              ? {
-                                  ...scenario,
-                                  connections: scenario.connections.map((c) =>
-                                    c.id === pendingConnection.id
-                                      ? {
-                                          ...c,
-                                          connectorType: modalConnectorType,
-                                          notes: modalNotes,
-                                          impactEffects: modalImpactEffects,
-                                          otherImpactEffect:
-                                            modalImpactEffects.includes(
-                                              "Other (please specify)"
-                                            )
-                                              ? modalOtherImpactEffect
-                                              : undefined,
-                                        }
-                                      : c
-                                  ),
-                                  modifiedAt: new Date().toISOString(),
-                                }
-                              : scenario
-                          )
-                        );
+              </div>
+              <div className="mb-3">
+                <label className="block text-xs mb-1">Degradations</label>
+                <div className="max-h-32 overflow-y-auto space-y-1">
+                  {IMPACT_EFFECTS.map((effect) => (
+                    <label
+                      key={effect}
+                      className="flex items-center gap-2 text-xs"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={modalImpactEffects.includes(effect)}
+                        onChange={() => {
+                          setModalImpactEffects((prev) =>
+                            prev.includes(effect)
+                              ? prev.filter((e) => e !== effect)
+                              : [...prev, effect]
+                          );
+                        }}
+                      />
+                      {effect}
+                    </label>
+                  ))}
+                </div>
+                {modalImpactEffects.includes("Other (please specify)") && (
+                  <input
+                    className="w-full border rounded px-2 py-1 mt-2"
+                    type="text"
+                    placeholder="Please specify other effect"
+                    value={modalOtherImpactEffect}
+                    onChange={(e) => setModalOtherImpactEffect(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                )}
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowConnectionModal(false);
+                    setPendingConnection(null);
+                    setModalConnectorType(undefined);
+                    setModalNotes("");
+                    setModalImpactEffects([]);
+                    setModalOtherImpactEffect("");
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm"
+                  disabled={!modalConnectorType}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (pendingConnection) {
+                      if ("id" in pendingConnection && pendingConnection.id) {
+                        // Edit existing connection
+                        if (scenarioMode && activeScenario) {
+                          // Edit connection in active scenario
+                          setScenarios((prev) =>
+                            prev.map((scenario) =>
+                              scenario.id === activeScenario
+                                ? {
+                                    ...scenario,
+                                    connections: scenario.connections.map((c) =>
+                                      c.id === pendingConnection.id
+                                        ? {
+                                            ...c,
+                                            connectorType: modalConnectorType,
+                                            notes: modalNotes,
+                                            impactEffects: modalImpactEffects,
+                                            otherImpactEffect:
+                                              modalImpactEffects.includes(
+                                                "Other (please specify)"
+                                              )
+                                                ? modalOtherImpactEffect
+                                                : undefined,
+                                          }
+                                        : c
+                                    ),
+                                    modifiedAt: new Date().toISOString(),
+                                  }
+                                : scenario
+                            )
+                          );
+                        } else {
+                          // Edit base connection
+                          setConnections((prev) =>
+                            prev.map((c) =>
+                              c.id === pendingConnection.id
+                                ? {
+                                    ...c,
+                                    connectorType: modalConnectorType,
+                                    notes: modalNotes,
+                                    impactEffects: modalImpactEffects,
+                                    otherImpactEffect:
+                                      modalImpactEffects.includes(
+                                        "Other (please specify)"
+                                      )
+                                        ? modalOtherImpactEffect
+                                        : undefined,
+                                  }
+                                : c
+                            )
+                          );
+                        }
                       } else {
-                        // Edit base connection
-                        setConnections((prev) =>
-                          prev.map((c) =>
-                            c.id === pendingConnection.id
-                              ? {
-                                  ...c,
-                                  connectorType: modalConnectorType,
-                                  notes: modalNotes,
-                                  impactEffects: modalImpactEffects,
-                                  otherImpactEffect:
-                                    modalImpactEffects.includes(
-                                      "Other (please specify)"
-                                    )
-                                      ? modalOtherImpactEffect
-                                      : undefined,
-                                }
-                              : c
-                          )
-                        );
-                      }
-                    } else {
-                      // Add new connection
-                      if (scenarioMode && activeScenario) {
-                        // Add to active scenario
-                        const newScenarioConnection: ScenarioConnection = {
-                          id: `scenario-connection-${Date.now()}`,
-                          from: pendingConnection.from,
-                          to: pendingConnection.to,
-                          connectorType: modalConnectorType,
-                          notes: modalNotes,
-                          impactEffects: modalImpactEffects,
-                          otherImpactEffect: modalImpactEffects.includes(
-                            "Other (please specify)"
-                          )
-                            ? modalOtherImpactEffect
-                            : undefined,
-                          status: "new",
-                        };
-
-                        setScenarios((prev) =>
-                          prev.map((scenario) =>
-                            scenario.id === activeScenario
-                              ? {
-                                  ...scenario,
-                                  connections: [
-                                    ...scenario.connections,
-                                    newScenarioConnection,
-                                  ],
-                                  modifiedAt: new Date().toISOString(),
-                                }
-                              : scenario
-                          )
-                        );
-                      } else {
-                        // Add to base connections
-                        setConnections((prev) => [
-                          ...prev,
-                          {
-                            id: `${pendingConnection.from}-${
-                              pendingConnection.to
-                            }-${Date.now()}`,
+                        // Add new connection
+                        if (scenarioMode && activeScenario) {
+                          // Add to active scenario
+                          const newScenarioConnection: ScenarioConnection = {
+                            id: `scenario-connection-${Date.now()}`,
                             from: pendingConnection.from,
                             to: pendingConnection.to,
                             connectorType: modalConnectorType,
@@ -3827,185 +3966,221 @@ export default function AdvancedInfrastructureMapper() {
                             )
                               ? modalOtherImpactEffect
                               : undefined,
-                          },
-                        ]);
+                            status: "new",
+                          };
+
+                          setScenarios((prev) =>
+                            prev.map((scenario) =>
+                              scenario.id === activeScenario
+                                ? {
+                                    ...scenario,
+                                    connections: [
+                                      ...scenario.connections,
+                                      newScenarioConnection,
+                                    ],
+                                    modifiedAt: new Date().toISOString(),
+                                  }
+                                : scenario
+                            )
+                          );
+                        } else {
+                          // Add to base connections
+                          setConnections((prev) => [
+                            ...prev,
+                            {
+                              id: `${pendingConnection.from}-${
+                                pendingConnection.to
+                              }-${Date.now()}`,
+                              from: pendingConnection.from,
+                              to: pendingConnection.to,
+                              connectorType: modalConnectorType,
+                              notes: modalNotes,
+                              impactEffects: modalImpactEffects,
+                              otherImpactEffect: modalImpactEffects.includes(
+                                "Other (please specify)"
+                              )
+                                ? modalOtherImpactEffect
+                                : undefined,
+                            },
+                          ]);
+                        }
                       }
                     }
-                  }
-                  setShowConnectionModal(false);
-                  setPendingConnection(null);
-                  setModalConnectorType(undefined);
-                  setModalNotes("");
-                }}
-              >
-                {pendingConnection && "id" in pendingConnection
-                  ? "Save Changes"
-                  : "Add Connection"}
-              </button>
+                    setShowConnectionModal(false);
+                    setPendingConnection(null);
+                    setModalConnectorType(undefined);
+                    setModalNotes("");
+                  }}
+                >
+                  {pendingConnection && "id" in pendingConnection
+                    ? "Save Changes"
+                    : "Add Connection"}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Infrastructure Element Modal */}
-      {showElementModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40"
-          onClick={(e) => {
-            // Close modal when clicking on backdrop
-            if (e.target === e.currentTarget) {
-              setShowElementModal(false);
-              setPendingElement(null);
-              setModalInfrastructureProblems([]);
-              setModalOtherInfrastructureProblem("");
-            }
-          }}
-        >
+        {/* Infrastructure Element Modal */}
+        {showElementModal && (
           <div
-            className="bg-white rounded shadow-lg p-6 w-80"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40"
             onClick={(e) => {
-              // Prevent clicks inside modal from bubbling up
-              e.stopPropagation();
+              // Close modal when clicking on backdrop
+              if (e.target === e.currentTarget) {
+                setShowElementModal(false);
+                setPendingElement(null);
+                setModalInfrastructureProblems([]);
+                setModalOtherInfrastructureProblem("");
+              }
             }}
           >
-            <h2 className="text-lg font-semibold mb-4">
-              Degradations - {pendingElement?.name}
-            </h2>
-            <div className="mb-3">
-              <label className="block text-xs mb-1">Degradations</label>
-              <div className="max-h-40 overflow-y-auto space-y-1">
-                {INFRASTRUCTURE_PROBLEMS.map((problem) => (
-                  <label
-                    key={problem}
-                    className="flex items-center gap-2 text-xs"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={modalInfrastructureProblems.includes(problem)}
-                      onChange={() => {
-                        setModalInfrastructureProblems((prev) =>
-                          prev.includes(problem)
-                            ? prev.filter((p) => p !== problem)
-                            : [...prev, problem]
-                        );
-                      }}
-                    />
-                    {problem}
-                  </label>
-                ))}
-              </div>
-              {modalInfrastructureProblems.includes(
-                "Other (please specify)"
-              ) && (
-                <input
-                  className="w-full border rounded px-2 py-1 mt-2"
-                  type="text"
-                  placeholder="Please specify other problem"
-                  value={modalOtherInfrastructureProblem}
-                  onChange={(e) =>
-                    setModalOtherInfrastructureProblem(e.target.value)
-                  }
-                  onClick={(e) => e.stopPropagation()}
-                />
-              )}
-            </div>
-            <div className="flex justify-end gap-2">
-              <button
-                className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowElementModal(false);
-                  setPendingElement(null);
-                  setModalInfrastructureProblems([]);
-                  setModalOtherInfrastructureProblem("");
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (pendingElement) {
-                    if (scenarioMode && activeScenario) {
-                      // Edit element in active scenario
-                      setScenarios((prev) =>
-                        prev.map((scenario) =>
-                          scenario.id === activeScenario
-                            ? {
-                                ...scenario,
-                                elements: scenario.elements.map((elem) =>
-                                  elem.id === pendingElement.id
-                                    ? {
-                                        ...elem,
-                                        infrastructureProblems:
-                                          modalInfrastructureProblems,
-                                        otherInfrastructureProblem:
-                                          modalInfrastructureProblems.includes(
-                                            "Other (please specify)"
-                                          )
-                                            ? modalOtherInfrastructureProblem
-                                            : undefined,
-                                      }
-                                    : elem
-                                ),
-                                modifiedAt: new Date().toISOString(),
-                              }
-                            : scenario
-                        )
-                      );
-                    } else {
-                      // Edit base element
-                      setElements((prev) =>
-                        prev.map((elem) =>
-                          elem.id === pendingElement.id
-                            ? {
-                                ...elem,
-                                infrastructureProblems:
-                                  modalInfrastructureProblems,
-                                otherInfrastructureProblem:
-                                  modalInfrastructureProblems.includes(
-                                    "Other (please specify)"
-                                  )
-                                    ? modalOtherInfrastructureProblem
-                                    : undefined,
-                              }
-                            : elem
-                        )
-                      );
-                    }
-                  }
-                  setShowElementModal(false);
-                  setPendingElement(null);
-                  setModalInfrastructureProblems([]);
-                  setModalOtherInfrastructureProblem("");
-                }}
-              >
-                Save Changes
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* License Modal/Sheet */}
-      {showLicense && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white rounded-lg -lg max-w-lg w-full p-6 relative">
-            <button
-              className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
-              onClick={() => setShowLicense(false)}
-              aria-label="Close"
+            <div
+              className="bg-white rounded shadow-lg p-6 w-80"
+              onClick={(e) => {
+                // Prevent clicks inside modal from bubbling up
+                e.stopPropagation();
+              }}
             >
-              <X className="w-5 h-5" />
-            </button>
-            <h2 className="text-lg font-bold mb-2">License & Authors</h2>
-            <pre className="whitespace-pre-wrap text-xs text-gray-700 mb-2">
-              {LICENSE_TEXT}
-            </pre>
+              <h2 className="text-lg font-semibold mb-4">
+                Degradations - {pendingElement?.name}
+              </h2>
+              <div className="mb-3">
+                <label className="block text-xs mb-1">Degradations</label>
+                <div className="max-h-40 overflow-y-auto space-y-1">
+                  {INFRASTRUCTURE_PROBLEMS.map((problem) => (
+                    <label
+                      key={problem}
+                      className="flex items-center gap-2 text-xs"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={modalInfrastructureProblems.includes(problem)}
+                        onChange={() => {
+                          setModalInfrastructureProblems((prev) =>
+                            prev.includes(problem)
+                              ? prev.filter((p) => p !== problem)
+                              : [...prev, problem]
+                          );
+                        }}
+                      />
+                      {problem}
+                    </label>
+                  ))}
+                </div>
+                {modalInfrastructureProblems.includes(
+                  "Other (please specify)"
+                ) && (
+                  <input
+                    className="w-full border rounded px-2 py-1 mt-2"
+                    type="text"
+                    placeholder="Please specify other problem"
+                    value={modalOtherInfrastructureProblem}
+                    onChange={(e) =>
+                      setModalOtherInfrastructureProblem(e.target.value)
+                    }
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                )}
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowElementModal(false);
+                    setPendingElement(null);
+                    setModalInfrastructureProblems([]);
+                    setModalOtherInfrastructureProblem("");
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (pendingElement) {
+                      if (scenarioMode && activeScenario) {
+                        // Edit element in active scenario
+                        setScenarios((prev) =>
+                          prev.map((scenario) =>
+                            scenario.id === activeScenario
+                              ? {
+                                  ...scenario,
+                                  elements: scenario.elements.map((elem) =>
+                                    elem.id === pendingElement.id
+                                      ? {
+                                          ...elem,
+                                          infrastructureProblems:
+                                            modalInfrastructureProblems,
+                                          otherInfrastructureProblem:
+                                            modalInfrastructureProblems.includes(
+                                              "Other (please specify)"
+                                            )
+                                              ? modalOtherInfrastructureProblem
+                                              : undefined,
+                                        }
+                                      : elem
+                                  ),
+                                  modifiedAt: new Date().toISOString(),
+                                }
+                              : scenario
+                          )
+                        );
+                      } else {
+                        // Edit base element
+                        setElements((prev) =>
+                          prev.map((elem) =>
+                            elem.id === pendingElement.id
+                              ? {
+                                  ...elem,
+                                  infrastructureProblems:
+                                    modalInfrastructureProblems,
+                                  otherInfrastructureProblem:
+                                    modalInfrastructureProblems.includes(
+                                      "Other (please specify)"
+                                    )
+                                      ? modalOtherInfrastructureProblem
+                                      : undefined,
+                                }
+                              : elem
+                          )
+                        );
+                      }
+                    }
+                    setShowElementModal(false);
+                    setPendingElement(null);
+                    setModalInfrastructureProblems([]);
+                    setModalOtherInfrastructureProblem("");
+                  }}
+                >
+                  Save Changes
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+
+        {/* License Modal/Sheet */}
+        {showLicense && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+            <div className="bg-white rounded-lg -lg max-w-lg w-full p-6 relative">
+              <button
+                className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+                onClick={() => setShowLicense(false)}
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <h2 className="text-lg font-bold mb-2">License & Authors</h2>
+              <pre className="whitespace-pre-wrap text-xs text-gray-700 mb-2">
+                {LICENSE_TEXT}
+              </pre>
+            </div>
+          </div>
+        )}
+      </div>
+    </TooltipProvider>
   );
 }
