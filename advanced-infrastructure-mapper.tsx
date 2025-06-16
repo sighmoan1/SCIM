@@ -367,6 +367,8 @@ export default function AdvancedInfrastructureMapper() {
     null
   );
   const [resizeHandle, setResizeHandle] = useState<string | null>(null);
+  // New state for layer hover visual feedback
+  const [hoveredLayerId, setHoveredLayerId] = useState<string | null>(null);
 
   // Form states
   const [newElementName, setNewElementName] = useState("");
@@ -461,6 +463,35 @@ export default function AdvancedInfrastructureMapper() {
     if (scaledLayers.length === 0) return maxRadius;
     return Math.max(...scaledLayers.map((layer) => layer.radius));
   }, [scaledLayers, maxRadius]);
+
+  // Helper function to determine which layer an element is closest to
+  const getClosestLayer = useCallback(
+    (x: number, y: number) => {
+      const distanceFromCenter = Math.sqrt(
+        Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2)
+      );
+
+      // Find the layer that the element is within or closest to
+      const sortedLayers = [...scaledLayers].sort(
+        (a, b) => a.radius - b.radius
+      );
+
+      // If element is outside all layers, return the outermost layer
+      if (distanceFromCenter > sortedLayers[sortedLayers.length - 1]?.radius) {
+        return sortedLayers[sortedLayers.length - 1];
+      }
+
+      // Find the first layer that contains the element
+      for (const layer of sortedLayers) {
+        if (distanceFromCenter <= layer.radius) {
+          return layer;
+        }
+      }
+
+      return sortedLayers[0]; // fallback to innermost layer
+    },
+    [scaledLayers, centerX, centerY]
+  );
 
   // Calculate dynamic threat segments
   const threatSegments = useMemo(() => {
@@ -642,11 +673,39 @@ export default function AdvancedInfrastructureMapper() {
         const originalX = (scaledX - centerX) / scaleX + 450;
         const originalY = (scaledY - centerY) / scaleY + 400;
 
+        // Determine which layer the element is currently over for visual feedback
+        const closestLayer = getClosestLayer(scaledX, scaledY);
+        setHoveredLayerId(closestLayer?.id || null);
+
         setElements((prev) =>
           prev.map((el) =>
             el.id === draggedElement
               ? { ...el, x: originalX, y: originalY }
               : el
+          )
+        );
+      } else if (draggedSegment && svgRef.current) {
+        // Handle segment dragging (change segment size by updating threat angles)
+        const rect = svgRef.current.getBoundingClientRect();
+        const mouseX =
+          (e.clientX - rect.left) * (svgDimensions.width / rect.width);
+        const mouseY =
+          (e.clientY - rect.top) * (svgDimensions.height / rect.height);
+
+        // Calculate the angle from center to mouse position
+        const dx = mouseX - centerX;
+        const dy = mouseY - centerY;
+        let newAngle = (Math.atan2(dy, dx) * 180) / Math.PI;
+
+        // Normalize angle to 0-360 range
+        if (newAngle < 0) newAngle += 360;
+
+        // Update the threat angle
+        setThreats((prev) =>
+          prev.map((threat) =>
+            threat.id === draggedSegment
+              ? { ...threat, angle: newAngle }
+              : threat
           )
         );
       }
@@ -663,6 +722,8 @@ export default function AdvancedInfrastructureMapper() {
       dragOffset,
       centerX,
       centerY,
+      setThreats,
+      getClosestLayer,
     ]
   );
 
@@ -673,6 +734,8 @@ export default function AdvancedInfrastructureMapper() {
     setResizeHandle(null);
     setDraggedImpactZone(null);
     setDraggedSegment(null);
+    // Clear layer hover effect when drag ends
+    setHoveredLayerId(null);
   };
 
   // Helper function to wrap text
@@ -2341,32 +2404,54 @@ export default function AdvancedInfrastructureMapper() {
               })}
 
             {/* Concentric circles for layers */}
-            {scaledLayers.map((layer) => (
-              <circle
-                key={layer.id}
-                cx={centerX}
-                cy={centerY}
-                r={layer.radius}
-                fill="none"
-                stroke="#374151"
-                strokeWidth={1}
-                strokeOpacity={0.6}
-              />
-            ))}
+            {scaledLayers.map((layer) => {
+              const isHovered = hoveredLayerId === layer.id;
+              return (
+                <circle
+                  key={layer.id}
+                  cx={centerX}
+                  cy={centerY}
+                  r={layer.radius}
+                  fill={isHovered ? layer.color : "none"}
+                  fillOpacity={isHovered ? layer.opacity * 0.3 : 0}
+                  stroke={isHovered ? layer.color : "#374151"}
+                  strokeWidth={isHovered ? 3 : 1}
+                  strokeOpacity={isHovered ? 0.8 : 0.6}
+                  className={isHovered ? "animate-pulse" : ""}
+                  style={{
+                    filter: isHovered
+                      ? "drop-shadow(0 0 10px rgba(59, 130, 246, 0.5))"
+                      : "none",
+                    transition: "all 0.2s ease-in-out",
+                  }}
+                />
+              );
+            })}
 
             {/* Layer labels */}
-            {scaledLayers.map((layer) => (
-              <text
-                key={`label-${layer.id}`}
-                x={centerX}
-                y={centerY - layer.radius + 15}
-                textAnchor="middle"
-                className="text-xs sm:text-sm font-medium fill-gray-700 pointer-events-none select-none"
-                style={{ userSelect: "none" }}
-              >
-                {layer.name}
-              </text>
-            ))}
+            {scaledLayers.map((layer) => {
+              const isHovered = hoveredLayerId === layer.id;
+              return (
+                <text
+                  key={`label-${layer.id}`}
+                  x={centerX}
+                  y={centerY - layer.radius + 15}
+                  textAnchor="middle"
+                  className={`text-xs sm:text-sm font-medium pointer-events-none select-none ${
+                    isHovered ? "fill-blue-600 font-bold" : "fill-gray-700"
+                  }`}
+                  style={{
+                    userSelect: "none",
+                    filter: isHovered
+                      ? "drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3))"
+                      : "none",
+                    transition: "all 0.2s ease-in-out",
+                  }}
+                >
+                  {layer.name}
+                </text>
+              );
+            })}
 
             {/* Custom Impact Zones */}
             {impactZones.map((zone) => {
