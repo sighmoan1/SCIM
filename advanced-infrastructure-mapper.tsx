@@ -1949,8 +1949,6 @@ export default function AdvancedInfrastructureMapper() {
                       dominantBaseline="middle"
                       className="text-sm font-bold fill-gray-900 pointer-events-none select-none"
                       style={{
-                        textShadow: "2px 2px 4px rgba(255,255,255,0.9)",
-                        filter: "drop-shadow(1px 1px 2px rgba(0,0,0,0.3))",
                         userSelect: "none",
                       }}
                     >
@@ -2211,7 +2209,7 @@ export default function AdvancedInfrastructureMapper() {
       {/* License Modal/Sheet */}
       {showLicense && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white rounded-lg shadow-lg max-w-lg w-full p-6 relative">
+          <div className="bg-white rounded-lg -lg max-w-lg w-full p-6 relative">
             <button
               className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
               onClick={() => setShowLicense(false)}
