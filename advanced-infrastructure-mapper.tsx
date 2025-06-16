@@ -3811,7 +3811,21 @@ export default function AdvancedInfrastructureMapper() {
                 e.stopPropagation();
               }}
             >
-              <h2 className="text-lg font-semibold mb-4">New Connection</h2>
+              <h2 className="text-lg font-semibold mb-4">
+                {pendingConnection
+                  ? (() => {
+                      const fromElement = currentElements.find(
+                        (e) => e.id === pendingConnection.from
+                      );
+                      const toElement = currentElements.find(
+                        (e) => e.id === pendingConnection.to
+                      );
+                      return `${fromElement?.name || "Unknown"} → ${
+                        toElement?.name || "Unknown"
+                      }`;
+                    })()
+                  : "New Connection"}
+              </h2>
               <div className="mb-3">
                 <label className="block text-xs mb-1">Connector Type</label>
                 <select
@@ -3878,119 +3892,116 @@ export default function AdvancedInfrastructureMapper() {
                   />
                 )}
               </div>
-              <div className="flex justify-end gap-2">
-                <button
-                  className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowConnectionModal(false);
-                    setPendingConnection(null);
-                    setModalConnectorType(undefined);
-                    setModalNotes("");
-                    setModalImpactEffects([]);
-                    setModalOtherImpactEffect("");
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm"
-                  disabled={!modalConnectorType}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (pendingConnection) {
-                      if ("id" in pendingConnection && pendingConnection.id) {
-                        // Edit existing connection
-                        if (scenarioMode && activeScenario) {
-                          // Edit connection in active scenario
-                          setScenarios((prev) =>
-                            prev.map((scenario) =>
-                              scenario.id === activeScenario
-                                ? {
-                                    ...scenario,
-                                    connections: scenario.connections.map((c) =>
-                                      c.id === pendingConnection.id
-                                        ? {
-                                            ...c,
-                                            connectorType: modalConnectorType,
-                                            notes: modalNotes,
-                                            impactEffects: modalImpactEffects,
-                                            otherImpactEffect:
-                                              modalImpactEffects.includes(
-                                                "Other (please specify)"
-                                              )
-                                                ? modalOtherImpactEffect
-                                                : undefined,
-                                          }
-                                        : c
-                                    ),
-                                    modifiedAt: new Date().toISOString(),
-                                  }
-                                : scenario
+              <div className="flex justify-between gap-2">
+                <div>
+                  {pendingConnection &&
+                    "id" in pendingConnection &&
+                    pendingConnection.id && (
+                      <button
+                        className="px-3 py-1 rounded bg-red-600 hover:bg-red-700 text-white text-sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (
+                            pendingConnection?.id &&
+                            confirm(
+                              "Are you sure you want to delete this connection?"
                             )
-                          );
+                          ) {
+                            deleteConnection(pendingConnection.id);
+                            setShowConnectionModal(false);
+                            setPendingConnection(null);
+                            setModalConnectorType(undefined);
+                            setModalNotes("");
+                            setModalImpactEffects([]);
+                            setModalOtherImpactEffect("");
+                          }
+                        }}
+                      >
+                        Delete
+                      </button>
+                    )}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowConnectionModal(false);
+                      setPendingConnection(null);
+                      setModalConnectorType(undefined);
+                      setModalNotes("");
+                      setModalImpactEffects([]);
+                      setModalOtherImpactEffect("");
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm"
+                    disabled={!modalConnectorType}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (pendingConnection) {
+                        if ("id" in pendingConnection && pendingConnection.id) {
+                          // Edit existing connection
+                          if (scenarioMode && activeScenario) {
+                            // Edit connection in active scenario
+                            setScenarios((prev) =>
+                              prev.map((scenario) =>
+                                scenario.id === activeScenario
+                                  ? {
+                                      ...scenario,
+                                      connections: scenario.connections.map(
+                                        (c) =>
+                                          c.id === pendingConnection.id
+                                            ? {
+                                                ...c,
+                                                connectorType:
+                                                  modalConnectorType,
+                                                notes: modalNotes,
+                                                impactEffects:
+                                                  modalImpactEffects,
+                                                otherImpactEffect:
+                                                  modalImpactEffects.includes(
+                                                    "Other (please specify)"
+                                                  )
+                                                    ? modalOtherImpactEffect
+                                                    : undefined,
+                                              }
+                                            : c
+                                      ),
+                                      modifiedAt: new Date().toISOString(),
+                                    }
+                                  : scenario
+                              )
+                            );
+                          } else {
+                            // Edit base connection
+                            setConnections((prev) =>
+                              prev.map((c) =>
+                                c.id === pendingConnection.id
+                                  ? {
+                                      ...c,
+                                      connectorType: modalConnectorType,
+                                      notes: modalNotes,
+                                      impactEffects: modalImpactEffects,
+                                      otherImpactEffect:
+                                        modalImpactEffects.includes(
+                                          "Other (please specify)"
+                                        )
+                                          ? modalOtherImpactEffect
+                                          : undefined,
+                                    }
+                                  : c
+                              )
+                            );
+                          }
                         } else {
-                          // Edit base connection
-                          setConnections((prev) =>
-                            prev.map((c) =>
-                              c.id === pendingConnection.id
-                                ? {
-                                    ...c,
-                                    connectorType: modalConnectorType,
-                                    notes: modalNotes,
-                                    impactEffects: modalImpactEffects,
-                                    otherImpactEffect:
-                                      modalImpactEffects.includes(
-                                        "Other (please specify)"
-                                      )
-                                        ? modalOtherImpactEffect
-                                        : undefined,
-                                  }
-                                : c
-                            )
-                          );
-                        }
-                      } else {
-                        // Add new connection
-                        if (scenarioMode && activeScenario) {
-                          // Add to active scenario
-                          const newScenarioConnection: ScenarioConnection = {
-                            id: `scenario-connection-${Date.now()}`,
-                            from: pendingConnection.from,
-                            to: pendingConnection.to,
-                            connectorType: modalConnectorType,
-                            notes: modalNotes,
-                            impactEffects: modalImpactEffects,
-                            otherImpactEffect: modalImpactEffects.includes(
-                              "Other (please specify)"
-                            )
-                              ? modalOtherImpactEffect
-                              : undefined,
-                            status: "new",
-                          };
-
-                          setScenarios((prev) =>
-                            prev.map((scenario) =>
-                              scenario.id === activeScenario
-                                ? {
-                                    ...scenario,
-                                    connections: [
-                                      ...scenario.connections,
-                                      newScenarioConnection,
-                                    ],
-                                    modifiedAt: new Date().toISOString(),
-                                  }
-                                : scenario
-                            )
-                          );
-                        } else {
-                          // Add to base connections
-                          setConnections((prev) => [
-                            ...prev,
-                            {
-                              id: `${pendingConnection.from}-${
-                                pendingConnection.to
-                              }-${Date.now()}`,
+                          // Add new connection
+                          if (scenarioMode && activeScenario) {
+                            // Add to active scenario
+                            const newScenarioConnection: ScenarioConnection = {
+                              id: `scenario-connection-${Date.now()}`,
                               from: pendingConnection.from,
                               to: pendingConnection.to,
                               connectorType: modalConnectorType,
@@ -4001,21 +4012,57 @@ export default function AdvancedInfrastructureMapper() {
                               )
                                 ? modalOtherImpactEffect
                                 : undefined,
-                            },
-                          ]);
+                              status: "new",
+                            };
+
+                            setScenarios((prev) =>
+                              prev.map((scenario) =>
+                                scenario.id === activeScenario
+                                  ? {
+                                      ...scenario,
+                                      connections: [
+                                        ...scenario.connections,
+                                        newScenarioConnection,
+                                      ],
+                                      modifiedAt: new Date().toISOString(),
+                                    }
+                                  : scenario
+                              )
+                            );
+                          } else {
+                            // Add to base connections
+                            setConnections((prev) => [
+                              ...prev,
+                              {
+                                id: `${pendingConnection.from}-${
+                                  pendingConnection.to
+                                }-${Date.now()}`,
+                                from: pendingConnection.from,
+                                to: pendingConnection.to,
+                                connectorType: modalConnectorType,
+                                notes: modalNotes,
+                                impactEffects: modalImpactEffects,
+                                otherImpactEffect: modalImpactEffects.includes(
+                                  "Other (please specify)"
+                                )
+                                  ? modalOtherImpactEffect
+                                  : undefined,
+                              },
+                            ]);
+                          }
                         }
                       }
-                    }
-                    setShowConnectionModal(false);
-                    setPendingConnection(null);
-                    setModalConnectorType(undefined);
-                    setModalNotes("");
-                  }}
-                >
-                  {pendingConnection && "id" in pendingConnection
-                    ? "Save Changes"
-                    : "Add Connection"}
-                </button>
+                      setShowConnectionModal(false);
+                      setPendingConnection(null);
+                      setModalConnectorType(undefined);
+                      setModalNotes("");
+                    }}
+                  >
+                    {pendingConnection && "id" in pendingConnection
+                      ? "Save Changes"
+                      : "Add Connection"}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -4043,7 +4090,7 @@ export default function AdvancedInfrastructureMapper() {
               }}
             >
               <h2 className="text-lg font-semibold mb-4">
-                Degradations - {pendingElement?.name}
+                {pendingElement?.name}
               </h2>
               <div className="mb-3">
                 <label className="block text-xs mb-1">Degradations</label>
@@ -4083,80 +4130,104 @@ export default function AdvancedInfrastructureMapper() {
                   />
                 )}
               </div>
-              <div className="flex justify-end gap-2">
-                <button
-                  className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowElementModal(false);
-                    setPendingElement(null);
-                    setModalInfrastructureProblems([]);
-                    setModalOtherInfrastructureProblem("");
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (pendingElement) {
-                      if (scenarioMode && activeScenario) {
-                        // Edit element in active scenario
-                        setScenarios((prev) =>
-                          prev.map((scenario) =>
-                            scenario.id === activeScenario
-                              ? {
-                                  ...scenario,
-                                  elements: scenario.elements.map((elem) =>
-                                    elem.id === pendingElement.id
-                                      ? {
-                                          ...elem,
-                                          infrastructureProblems:
-                                            modalInfrastructureProblems,
-                                          otherInfrastructureProblem:
-                                            modalInfrastructureProblems.includes(
-                                              "Other (please specify)"
-                                            )
-                                              ? modalOtherInfrastructureProblem
-                                              : undefined,
-                                        }
-                                      : elem
-                                  ),
-                                  modifiedAt: new Date().toISOString(),
-                                }
-                              : scenario
-                          )
-                        );
-                      } else {
-                        // Edit base element
-                        setElements((prev) =>
-                          prev.map((elem) =>
-                            elem.id === pendingElement.id
-                              ? {
-                                  ...elem,
-                                  infrastructureProblems:
-                                    modalInfrastructureProblems,
-                                  otherInfrastructureProblem:
-                                    modalInfrastructureProblems.includes(
-                                      "Other (please specify)"
-                                    )
-                                      ? modalOtherInfrastructureProblem
-                                      : undefined,
-                                }
-                              : elem
-                          )
-                        );
+              <div className="flex justify-between gap-2">
+                <div>
+                  <button
+                    className="px-3 py-1 rounded bg-red-600 hover:bg-red-700 text-white text-sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (
+                        pendingElement?.id &&
+                        confirm(
+                          `Are you sure you want to delete "${pendingElement.name}"?`
+                        )
+                      ) {
+                        deleteElement(pendingElement.id);
+                        setShowElementModal(false);
+                        setPendingElement(null);
+                        setModalInfrastructureProblems([]);
+                        setModalOtherInfrastructureProblem("");
                       }
-                    }
-                    setShowElementModal(false);
-                    setPendingElement(null);
-                    setModalInfrastructureProblems([]);
-                    setModalOtherInfrastructureProblem("");
-                  }}
-                >
-                  Save Changes
-                </button>
+                    }}
+                  >
+                    Delete
+                  </button>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowElementModal(false);
+                      setPendingElement(null);
+                      setModalInfrastructureProblems([]);
+                      setModalOtherInfrastructureProblem("");
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (pendingElement) {
+                        if (scenarioMode && activeScenario) {
+                          // Edit element in active scenario
+                          setScenarios((prev) =>
+                            prev.map((scenario) =>
+                              scenario.id === activeScenario
+                                ? {
+                                    ...scenario,
+                                    elements: scenario.elements.map((elem) =>
+                                      elem.id === pendingElement.id
+                                        ? {
+                                            ...elem,
+                                            infrastructureProblems:
+                                              modalInfrastructureProblems,
+                                            otherInfrastructureProblem:
+                                              modalInfrastructureProblems.includes(
+                                                "Other (please specify)"
+                                              )
+                                                ? modalOtherInfrastructureProblem
+                                                : undefined,
+                                          }
+                                        : elem
+                                    ),
+                                    modifiedAt: new Date().toISOString(),
+                                  }
+                                : scenario
+                            )
+                          );
+                        } else {
+                          // Edit base element
+                          setElements((prev) =>
+                            prev.map((elem) =>
+                              elem.id === pendingElement.id
+                                ? {
+                                    ...elem,
+                                    infrastructureProblems:
+                                      modalInfrastructureProblems,
+                                    otherInfrastructureProblem:
+                                      modalInfrastructureProblems.includes(
+                                        "Other (please specify)"
+                                      )
+                                        ? modalOtherInfrastructureProblem
+                                        : undefined,
+                                  }
+                                : elem
+                            )
+                          );
+                        }
+                      }
+                      setShowElementModal(false);
+                      setPendingElement(null);
+                      setModalInfrastructureProblems([]);
+                      setModalOtherInfrastructureProblem("");
+                    }}
+                  >
+                    Save Changes
+                  </button>
+                </div>
               </div>
             </div>
           </div>
