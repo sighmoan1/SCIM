@@ -165,6 +165,15 @@
             "type": "number",
             "minimum": 0,
             "description": "Element height"
+          },
+          "infrastructureProblems": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "List of Degradations affecting this element"
+          },
+          "otherInfrastructureProblem": {
+            "type": "string",
+            "description": "Custom infrastructure problem if 'Other' is selected"
           }
         }
       }
@@ -196,6 +205,15 @@
           "notes": {
             "type": "string",
             "description": "Free-text notes for the connector"
+          },
+          "impactEffects": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "List of likely effects on this connection"
+          },
+          "otherImpactEffect": {
+            "type": "string",
+            "description": "Custom effect if 'Other' is selected"
           }
         }
       }
@@ -240,24 +258,6 @@
           "zIndex": {
             "type": "number",
             "description": "Drawing order (optional)"
-          },
-          "infrastructureProblems": {
-            "type": "array",
-            "items": { "type": "string" },
-            "description": "List of infrastructure problems present in this zone"
-          },
-          "otherInfrastructureProblem": {
-            "type": "string",
-            "description": "Custom infrastructure problem if 'Other' is selected"
-          },
-          "impactEffects": {
-            "type": "array",
-            "items": { "type": "string" },
-            "description": "List of likely effects in this zone"
-          },
-          "otherImpactEffect": {
-            "type": "string",
-            "description": "Custom effect if 'Other' is selected"
           },
           "criticality": {
             "type": "string",

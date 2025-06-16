@@ -2406,7 +2406,74 @@ export default function AdvancedInfrastructureMapper() {
                       onFocus={(e) => e.stopPropagation()}
                     />
                   </div>
-
+                  <div>
+                    <Label className="text-xs">Degradations</Label>
+                    {INFRASTRUCTURE_PROBLEMS.map((problem) => (
+                      <label
+                        key={problem}
+                        className="flex items-center gap-2 text-xs"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={newImpactZoneProblems.includes(problem)}
+                          onChange={() => {
+                            setNewImpactZoneProblems((prev) =>
+                              prev.includes(problem)
+                                ? prev.filter((p) => p !== problem)
+                                : [...prev, problem]
+                            );
+                          }}
+                        />
+                        {problem}
+                      </label>
+                    ))}
+                    {newImpactZoneProblems.includes(
+                      "Other (please specify)"
+                    ) && (
+                      <Input
+                        placeholder="Please specify other problem"
+                        value={newImpactZoneOtherProblem}
+                        onChange={(e) =>
+                          setNewImpactZoneOtherProblem(e.target.value)
+                        }
+                        className="mt-1"
+                      />
+                    )}
+                  </div>
+                  <div>
+                    <Label className="text-xs">Degradations</Label>
+                    {IMPACT_EFFECTS.map((effect) => (
+                      <label
+                        key={effect}
+                        className="flex items-center gap-2 text-xs"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={newImpactZoneEffects.includes(effect)}
+                          onChange={() => {
+                            setNewImpactZoneEffects((prev) =>
+                              prev.includes(effect)
+                                ? prev.filter((e) => e !== effect)
+                                : [...prev, effect]
+                            );
+                          }}
+                        />
+                        {effect}
+                      </label>
+                    ))}
+                    {newImpactZoneEffects.includes(
+                      "Other (please specify)"
+                    ) && (
+                      <Input
+                        placeholder="Please specify other effect"
+                        value={newImpactZoneOtherEffect}
+                        onChange={(e) =>
+                          setNewImpactZoneOtherEffect(e.target.value)
+                        }
+                        className="mt-1"
+                      />
+                    )}
+                  </div>
                   <div>
                     <Label className="text-xs">Criticality</Label>
                     <select
@@ -2477,7 +2544,84 @@ export default function AdvancedInfrastructureMapper() {
                               className="text-sm h-6"
                               autoFocus
                             />
-
+                            <div>
+                              <Label className="text-xs">
+                                Degradations
+                              </Label>
+                              {INFRASTRUCTURE_PROBLEMS.map((problem) => (
+                                <label
+                                  key={problem}
+                                  className="flex items-center gap-2 text-xs"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={editingImpactZoneProblems.includes(
+                                      problem
+                                    )}
+                                    onChange={() => {
+                                      setEditingImpactZoneProblems((prev) =>
+                                        prev.includes(problem)
+                                          ? prev.filter((p) => p !== problem)
+                                          : [...prev, problem]
+                                      );
+                                    }}
+                                  />
+                                  {problem}
+                                </label>
+                              ))}
+                              {editingImpactZoneProblems.includes(
+                                "Other (please specify)"
+                              ) && (
+                                <Input
+                                  placeholder="Please specify other problem"
+                                  value={editingImpactZoneOtherProblem}
+                                  onChange={(e) =>
+                                    setEditingImpactZoneOtherProblem(
+                                      e.target.value
+                                    )
+                                  }
+                                  className="mt-1"
+                                />
+                              )}
+                            </div>
+                            <div>
+                              <Label className="text-xs">Degradations</Label>
+                              {IMPACT_EFFECTS.map((effect) => (
+                                <label
+                                  key={effect}
+                                  className="flex items-center gap-2 text-xs"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={editingImpactZoneEffects.includes(
+                                      effect
+                                    )}
+                                    onChange={() => {
+                                      setEditingImpactZoneEffects((prev) =>
+                                        prev.includes(effect)
+                                          ? prev.filter((e) => e !== effect)
+                                          : [...prev, effect]
+                                      );
+                                    }}
+                                  />
+                                  {effect}
+                                </label>
+                              ))}
+                              {editingImpactZoneEffects.includes(
+                                "Other (please specify)"
+                              ) && (
+                                <Input
+                                  placeholder="Please specify other effect"
+                                  value={editingImpactZoneOtherEffect}
+                                  onChange={(e) =>
+                                    setEditingImpactZoneOtherEffect(
+                                      e.target.value
+                                    )
+                                  }
+                                  className="mt-1"
+                                />
+                              )}
+                            </div>
                             <div>
                               <Label className="text-xs">Criticality</Label>
                               <select
@@ -2551,7 +2695,25 @@ export default function AdvancedInfrastructureMapper() {
                               Radius: {Math.round(zone.radius)}px • Position: (
                               {Math.round(zone.x)}, {Math.round(zone.y)})
                             </div>
-                            {/* Display zone properties */}
+                            {/* Display new fields */}
+                            {zone.infrastructureProblems &&
+                              zone.infrastructureProblems.length > 0 && (
+                                <div className="text-xs mt-1">
+                                  <b>Problems:</b>{" "}
+                                  {zone.infrastructureProblems.join(", ")}
+                                  {zone.otherInfrastructureProblem &&
+                                    ` (${zone.otherInfrastructureProblem})`}
+                                </div>
+                              )}
+                            {zone.impactEffects &&
+                              zone.impactEffects.length > 0 && (
+                                <div className="text-xs mt-1">
+                                  <b>Effects:</b>{" "}
+                                  {zone.impactEffects.join(", ")}
+                                  {zone.otherImpactEffect &&
+                                    ` (${zone.otherImpactEffect})`}
+                                </div>
+                              )}
                             {zone.criticality && (
                               <div className="text-xs mt-1">
                                 <b>Criticality:</b> {zone.criticality}
@@ -2768,21 +2930,6 @@ export default function AdvancedInfrastructureMapper() {
   const [modalConnectorType, setModalConnectorType] =
     useState<Connection["connectorType"]>(undefined);
   const [modalNotes, setModalNotes] = useState("");
-  const [modalImpactEffects, setModalImpactEffects] = useState<ImpactEffect[]>(
-    []
-  );
-  const [modalOtherImpactEffect, setModalOtherImpactEffect] = useState("");
-
-  // Infrastructure element modal state
-  const [pendingElement, setPendingElement] = useState<{
-    id: string;
-    name: string;
-  } | null>(null);
-  const [showElementModal, setShowElementModal] = useState(false);
-  const [modalInfrastructureProblems, setModalInfrastructureProblems] =
-    useState<InfrastructureProblem[]>([]);
-  const [modalOtherInfrastructureProblem, setModalOtherInfrastructureProblem] =
-    useState("");
 
   // Scenario management functions
   const createScenario = () => {
@@ -3342,10 +3489,6 @@ export default function AdvancedInfrastructureMapper() {
                       });
                       setModalConnectorType(connection.connectorType);
                       setModalNotes(connection.notes || "");
-                      setModalImpactEffects(connection.impactEffects || []);
-                      setModalOtherImpactEffect(
-                        connection.otherImpactEffect || ""
-                      );
                       setShowConnectionModal(true);
                     }}
                   />
@@ -3458,25 +3601,6 @@ export default function AdvancedInfrastructureMapper() {
                     onClick={(e) => {
                       e.stopPropagation();
                       handleElementClick(element.id);
-                    }}
-                    onDoubleClick={(e) => {
-                      e.stopPropagation();
-                      const currentElement = currentElements.find(
-                        (e) => e.id === element.id
-                      );
-                      if (currentElement) {
-                        setPendingElement({
-                          id: element.id,
-                          name: element.name,
-                        });
-                        setModalInfrastructureProblems(
-                          currentElement.infrastructureProblems || []
-                        );
-                        setModalOtherInfrastructureProblem(
-                          currentElement.otherInfrastructureProblem || ""
-                        );
-                        setShowElementModal(true);
-                      }
                     }}
                   />
 
@@ -3670,40 +3794,6 @@ export default function AdvancedInfrastructureMapper() {
                 onClick={(e) => e.stopPropagation()}
               />
             </div>
-            <div className="mb-3">
-              <label className="block text-xs mb-1">Degradations</label>
-              <div className="max-h-32 overflow-y-auto space-y-1">
-                {IMPACT_EFFECTS.map((effect) => (
-                  <label
-                    key={effect}
-                    className="flex items-center gap-2 text-xs"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={modalImpactEffects.includes(effect)}
-                      onChange={() => {
-                        setModalImpactEffects((prev) =>
-                          prev.includes(effect)
-                            ? prev.filter((e) => e !== effect)
-                            : [...prev, effect]
-                        );
-                      }}
-                    />
-                    {effect}
-                  </label>
-                ))}
-              </div>
-              {modalImpactEffects.includes("Other (please specify)") && (
-                <input
-                  className="w-full border rounded px-2 py-1 mt-2"
-                  type="text"
-                  placeholder="Please specify other effect"
-                  value={modalOtherImpactEffect}
-                  onChange={(e) => setModalOtherImpactEffect(e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              )}
-            </div>
             <div className="flex justify-end gap-2">
               <button
                 className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-sm"
@@ -3713,8 +3803,6 @@ export default function AdvancedInfrastructureMapper() {
                   setPendingConnection(null);
                   setModalConnectorType(undefined);
                   setModalNotes("");
-                  setModalImpactEffects([]);
-                  setModalOtherImpactEffect("");
                 }}
               >
                 Cancel
@@ -3740,13 +3828,6 @@ export default function AdvancedInfrastructureMapper() {
                                           ...c,
                                           connectorType: modalConnectorType,
                                           notes: modalNotes,
-                                          impactEffects: modalImpactEffects,
-                                          otherImpactEffect:
-                                            modalImpactEffects.includes(
-                                              "Other (please specify)"
-                                            )
-                                              ? modalOtherImpactEffect
-                                              : undefined,
                                         }
                                       : c
                                   ),
@@ -3764,13 +3845,6 @@ export default function AdvancedInfrastructureMapper() {
                                   ...c,
                                   connectorType: modalConnectorType,
                                   notes: modalNotes,
-                                  impactEffects: modalImpactEffects,
-                                  otherImpactEffect:
-                                    modalImpactEffects.includes(
-                                      "Other (please specify)"
-                                    )
-                                      ? modalOtherImpactEffect
-                                      : undefined,
                                 }
                               : c
                           )
@@ -3786,12 +3860,6 @@ export default function AdvancedInfrastructureMapper() {
                           to: pendingConnection.to,
                           connectorType: modalConnectorType,
                           notes: modalNotes,
-                          impactEffects: modalImpactEffects,
-                          otherImpactEffect: modalImpactEffects.includes(
-                            "Other (please specify)"
-                          )
-                            ? modalOtherImpactEffect
-                            : undefined,
                           status: "new",
                         };
 
@@ -3821,12 +3889,6 @@ export default function AdvancedInfrastructureMapper() {
                             to: pendingConnection.to,
                             connectorType: modalConnectorType,
                             notes: modalNotes,
-                            impactEffects: modalImpactEffects,
-                            otherImpactEffect: modalImpactEffects.includes(
-                              "Other (please specify)"
-                            )
-                              ? modalOtherImpactEffect
-                              : undefined,
                           },
                         ]);
                       }
@@ -3841,147 +3903,6 @@ export default function AdvancedInfrastructureMapper() {
                 {pendingConnection && "id" in pendingConnection
                   ? "Save Changes"
                   : "Add Connection"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Infrastructure Element Modal */}
-      {showElementModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40"
-          onClick={(e) => {
-            // Close modal when clicking on backdrop
-            if (e.target === e.currentTarget) {
-              setShowElementModal(false);
-              setPendingElement(null);
-              setModalInfrastructureProblems([]);
-              setModalOtherInfrastructureProblem("");
-            }
-          }}
-        >
-          <div
-            className="bg-white rounded shadow-lg p-6 w-80"
-            onClick={(e) => {
-              // Prevent clicks inside modal from bubbling up
-              e.stopPropagation();
-            }}
-          >
-            <h2 className="text-lg font-semibold mb-4">
-              Degradations - {pendingElement?.name}
-            </h2>
-            <div className="mb-3">
-              <label className="block text-xs mb-1">Degradations</label>
-              <div className="max-h-40 overflow-y-auto space-y-1">
-                {INFRASTRUCTURE_PROBLEMS.map((problem) => (
-                  <label
-                    key={problem}
-                    className="flex items-center gap-2 text-xs"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={modalInfrastructureProblems.includes(problem)}
-                      onChange={() => {
-                        setModalInfrastructureProblems((prev) =>
-                          prev.includes(problem)
-                            ? prev.filter((p) => p !== problem)
-                            : [...prev, problem]
-                        );
-                      }}
-                    />
-                    {problem}
-                  </label>
-                ))}
-              </div>
-              {modalInfrastructureProblems.includes(
-                "Other (please specify)"
-              ) && (
-                <input
-                  className="w-full border rounded px-2 py-1 mt-2"
-                  type="text"
-                  placeholder="Please specify other problem"
-                  value={modalOtherInfrastructureProblem}
-                  onChange={(e) =>
-                    setModalOtherInfrastructureProblem(e.target.value)
-                  }
-                  onClick={(e) => e.stopPropagation()}
-                />
-              )}
-            </div>
-            <div className="flex justify-end gap-2">
-              <button
-                className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowElementModal(false);
-                  setPendingElement(null);
-                  setModalInfrastructureProblems([]);
-                  setModalOtherInfrastructureProblem("");
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (pendingElement) {
-                    if (scenarioMode && activeScenario) {
-                      // Edit element in active scenario
-                      setScenarios((prev) =>
-                        prev.map((scenario) =>
-                          scenario.id === activeScenario
-                            ? {
-                                ...scenario,
-                                elements: scenario.elements.map((elem) =>
-                                  elem.id === pendingElement.id
-                                    ? {
-                                        ...elem,
-                                        infrastructureProblems:
-                                          modalInfrastructureProblems,
-                                        otherInfrastructureProblem:
-                                          modalInfrastructureProblems.includes(
-                                            "Other (please specify)"
-                                          )
-                                            ? modalOtherInfrastructureProblem
-                                            : undefined,
-                                      }
-                                    : elem
-                                ),
-                                modifiedAt: new Date().toISOString(),
-                              }
-                            : scenario
-                        )
-                      );
-                    } else {
-                      // Edit base element
-                      setElements((prev) =>
-                        prev.map((elem) =>
-                          elem.id === pendingElement.id
-                            ? {
-                                ...elem,
-                                infrastructureProblems:
-                                  modalInfrastructureProblems,
-                                otherInfrastructureProblem:
-                                  modalInfrastructureProblems.includes(
-                                    "Other (please specify)"
-                                  )
-                                    ? modalOtherInfrastructureProblem
-                                    : undefined,
-                              }
-                            : elem
-                        )
-                      );
-                    }
-                  }
-                  setShowElementModal(false);
-                  setPendingElement(null);
-                  setModalInfrastructureProblems([]);
-                  setModalOtherInfrastructureProblem("");
-                }}
-              >
-                Save Changes
               </button>
             </div>
           </div>
