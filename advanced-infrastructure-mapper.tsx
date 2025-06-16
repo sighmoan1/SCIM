@@ -2075,20 +2075,6 @@ export default function AdvancedInfrastructureMapper() {
                                   );
                                 }}
                               />
-                              <Badge
-                                style={{
-                                  backgroundColor:
-                                    connectionColors[
-                                      connection.connectorType as keyof typeof connectionColors
-                                    ] || "#3b82f6",
-                                }}
-                                className="text-xs text-white"
-                              >
-                                {connection.connectorType}
-                              </Badge>
-                              <Badge variant="outline" className="text-xs">
-                                {connection.strength}
-                              </Badge>
                             </div>
                           </div>
                           <Button
@@ -2612,8 +2598,25 @@ export default function AdvancedInfrastructureMapper() {
 
       {/* Connection Modal */}
       {showConnectionModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white rounded shadow-lg p-6 w-80">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40"
+          onClick={(e) => {
+            // Close modal when clicking on backdrop
+            if (e.target === e.currentTarget) {
+              setShowConnectionModal(false);
+              setPendingConnection(null);
+              setModalConnectorType(undefined);
+              setModalNotes("");
+            }
+          }}
+        >
+          <div
+            className="bg-white rounded shadow-lg p-6 w-80"
+            onClick={(e) => {
+              // Prevent clicks inside modal from bubbling up
+              e.stopPropagation();
+            }}
+          >
             <h2 className="text-lg font-semibold mb-4">New Connection</h2>
             <div className="mb-3">
               <label className="block text-xs mb-1">Connector Type</label>
@@ -2627,6 +2630,7 @@ export default function AdvancedInfrastructureMapper() {
                     e.target.value as Connection["connectorType"]
                   )
                 }
+                onClick={(e) => e.stopPropagation()}
               >
                 <option value="">Select type</option>
                 <option value="Produce on site">Produce on site</option>
@@ -2643,12 +2647,14 @@ export default function AdvancedInfrastructureMapper() {
                 type="text"
                 value={modalNotes}
                 onChange={(e) => setModalNotes(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
               />
             </div>
             <div className="flex justify-end gap-2">
               <button
                 className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-sm"
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   setShowConnectionModal(false);
                   setPendingConnection(null);
                   setModalConnectorType(undefined);
@@ -2660,7 +2666,8 @@ export default function AdvancedInfrastructureMapper() {
               <button
                 className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm"
                 disabled={!modalConnectorType}
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   if (pendingConnection) {
                     if ("id" in pendingConnection && pendingConnection.id) {
                       // Edit existing connection
