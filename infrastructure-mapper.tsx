@@ -389,12 +389,26 @@ export default function InfrastructureMapper() {
       reader.onload = (event) => {
         try {
           const data = JSON.parse(event.target?.result as string);
-          if (data.layers) setLayers(data.layers);
+
+          // Handle both old format (array) and new format (object) for layers
+          if (data.layers) {
+            if (Array.isArray(data.layers)) {
+              // Old format - layers is already an array
+              setLayers(data.layers);
+            } else {
+              // New format - layers is an object, convert to array
+              const layersArray = Object.values(data.layers) as Layer[];
+              setLayers(layersArray);
+            }
+          }
+
           if (data.threats) setThreats(data.threats);
           if (data.elements) setElements(data.elements);
           if (data.connections) setConnections(data.connections);
+
+          alert("Data imported successfully!");
         } catch (error) {
-          alert("Error importing file");
+          alert("Error importing file - please check the format");
         }
       };
       reader.readAsText(file);

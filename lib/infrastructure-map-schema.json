@@ -1,0 +1,210 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Infrastructure Map Export",
+  "description": "Schema for SCIM infrastructure mapping data export",
+  "type": "object",
+  "required": [
+    "version",
+    "coordinateSystem",
+    "defaults",
+    "layers",
+    "threats",
+    "elements",
+    "connections",
+    "metadata"
+  ],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Export format version for backward compatibility",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    },
+    "coordinateSystem": {
+      "type": "object",
+      "description": "Coordinate system specification",
+      "required": ["type", "origin", "units", "centerX", "centerY"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["cartesian"],
+          "description": "Coordinate system type"
+        },
+        "origin": {
+          "type": "string",
+          "enum": ["center", "top-left", "bottom-left"],
+          "description": "Origin point reference"
+        },
+        "units": {
+          "type": "string",
+          "description": "Base units for coordinates"
+        },
+        "centerX": {
+          "type": "number",
+          "description": "X coordinate of center point"
+        },
+        "centerY": {
+          "type": "number",
+          "description": "Y coordinate of center point"
+        }
+      }
+    },
+    "defaults": {
+      "type": "object",
+      "description": "Default units and settings",
+      "properties": {
+        "distanceUnits": {
+          "type": "string",
+          "description": "Default units for distances"
+        },
+        "angleUnits": {
+          "type": "string",
+          "enum": ["deg", "rad"],
+          "description": "Default units for angles"
+        }
+      }
+    },
+    "layers": {
+      "type": "object",
+      "description": "Normalized layer definitions indexed by name",
+      "patternProperties": {
+        "^[a-zA-Z_]+$": {
+          "type": "object",
+          "required": ["id", "name", "radius", "color", "opacity"],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Unique layer identifier"
+            },
+            "name": {
+              "type": "string",
+              "description": "Human-readable layer name"
+            },
+            "radius": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Layer radius from center"
+            },
+            "color": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$",
+              "description": "Layer color"
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "Layer opacity"
+            }
+          }
+        }
+      }
+    },
+    "threats": {
+      "type": "array",
+      "description": "Threat definitions",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "angle", "impactRadius"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique threat identifier"
+          },
+          "name": {
+            "type": "string",
+            "description": "Threat name"
+          },
+          "angle": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 360,
+            "description": "Threat angle in degrees"
+          },
+          "impactRadius": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Threat impact radius"
+          }
+        }
+      }
+    },
+    "elements": {
+      "type": "array",
+      "description": "Infrastructure elements",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "x", "y", "layer"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique element identifier"
+          },
+          "name": {
+            "type": "string",
+            "description": "Element name"
+          },
+          "x": {
+            "type": "number",
+            "description": "Cartesian X coordinate"
+          },
+          "y": {
+            "type": "number",
+            "description": "Cartesian Y coordinate"
+          },
+          "layer": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Layer index"
+          },
+          "width": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Element width"
+          },
+          "height": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Element height"
+          }
+        }
+      }
+    },
+    "connections": {
+      "type": "array",
+      "description": "Connections between elements",
+      "items": {
+        "type": "object",
+        "required": ["id", "from", "to"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Connection identifier"
+          },
+          "from": {
+            "type": "string",
+            "description": "Source element ID"
+          },
+          "to": {
+            "type": "string",
+            "description": "Target element ID"
+          }
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["exportedAt", "exportedBy"],
+      "properties": {
+        "exportedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Export timestamp"
+        },
+        "exportedBy": {
+          "type": "string",
+          "description": "Application that exported the data"
+        }
+      }
+    }
+  }
+}

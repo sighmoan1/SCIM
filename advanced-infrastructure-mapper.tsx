@@ -31,6 +31,7 @@ import {
   Edit2,
   Check,
 } from "lucide-react";
+import { validateExportBeforeDownload } from "@/lib/validation";
 
 interface Point {
   x: number;
@@ -60,7 +61,8 @@ interface ImpactZone {
   x: number;
   y: number;
   radius: number;
-  threatId?: string; // Optional reference to associated threat
+  threatId?: string;
+  zIndex?: number;
 }
 
 interface Connection {
@@ -69,6 +71,7 @@ interface Connection {
   to: string;
   type?: string;
   strength?: number;
+  description?: string;
 }
 
 interface Layer {
@@ -79,19 +82,96 @@ interface Layer {
   opacity: number;
 }
 
+// Export format interface
+interface InfrastructureMapExport {
+  version: string;
+  coordinateSystem: {
+    type: "cartesian";
+    origin: "center";
+    units: "pixels";
+    centerX: number;
+    centerY: number;
+  };
+  defaults: {
+    distanceUnits: "px";
+    angleUnits: "deg";
+  };
+  layers: Record<string, Layer>;
+  threats: Threat[];
+  elements: InfrastructureElement[];
+  connections: Connection[];
+  impactZones: ImpactZone[];
+  metadata: {
+    exportedAt: string;
+    exportedBy: string;
+  };
+}
+
 const defaultLayers: Layer[] = [
-  { id: "1", name: "person", radius: 60, color: "#dcfce7", opacity: 0.4 },
-  { id: "2", name: "home", radius: 100, color: "#bbf7d0", opacity: 0.4 },
-  { id: "3", name: "village", radius: 140, color: "#86efac", opacity: 0.4 },
-  { id: "4", name: "town", radius: 180, color: "#4ade80", opacity: 0.4 },
-  { id: "5", name: "region", radius: 220, color: "#22c55e", opacity: 0.4 },
-  { id: "6", name: "country", radius: 260, color: "#16a34a", opacity: 0.4 },
-  { id: "7", name: "world", radius: 300, color: "#15803d", opacity: 0.4 },
+  {
+    id: "1",
+    name: "person",
+    radius: 60,
+    color: "#dcfce7",
+    opacity: 0.4,
+  },
+  {
+    id: "2",
+    name: "home",
+    radius: 100,
+    color: "#bbf7d0",
+    opacity: 0.4,
+  },
+  {
+    id: "3",
+    name: "village",
+    radius: 140,
+    color: "#86efac",
+    opacity: 0.4,
+  },
+  {
+    id: "4",
+    name: "town",
+    radius: 180,
+    color: "#4ade80",
+    opacity: 0.4,
+  },
+  {
+    id: "5",
+    name: "region",
+    radius: 220,
+    color: "#22c55e",
+    opacity: 0.4,
+  },
+  {
+    id: "6",
+    name: "country",
+    radius: 260,
+    color: "#16a34a",
+    opacity: 0.4,
+  },
+  {
+    id: "7",
+    name: "world",
+    radius: 300,
+    color: "#15803d",
+    opacity: 0.4,
+  },
 ];
 
 const defaultThreats: Threat[] = [
-  { id: "1", name: "injury", angle: 0, impactRadius: 50 },
-  { id: "2", name: "too hot", angle: 60, impactRadius: 40 },
+  {
+    id: "1",
+    name: "injury",
+    angle: 0,
+    impactRadius: 50,
+  },
+  {
+    id: "2",
+    name: "too hot",
+    angle: 60,
+    impactRadius: 40,
+  },
   {
     id: "3",
     name: "too cold",
@@ -110,7 +190,12 @@ const defaultThreats: Threat[] = [
     angle: 240,
     impactRadius: 60,
   },
-  { id: "6", name: "illness", angle: 300, impactRadius: 50 },
+  {
+    id: "6",
+    name: "illness",
+    angle: 300,
+    impactRadius: 50,
+  },
 ];
 
 const defaultElements: InfrastructureElement[] = [
@@ -219,6 +304,8 @@ const connectionColors = {
   communication: "#8b5cf6",
   supply: "#f59e0b",
 };
+
+const LICENSE_TEXT = `This work is licensed under the Creative Commons Attribution-Noncommercial-Share Alike 2.0 UK: England & Wales License.\nTo view a copy of this license, visit http://creativecommons.org/licenses/by-nc-sa/2.0/uk/ or send a letter to Creative Commons, 171 Second Street, Suite 300, San Francisco, California, 94105, USA.\n\nAuthors:\nMike Bennett: As founder managing director of Plain Software, Mike played a vital role in the development of NHS Direct. He is now a strategic consultant on social, business and government resilience.\nVinay Gupta: Co-editor of Small is Profitable (The Economist's book of the year 2003) and Winning the Oil Endgame, Vinay focusses on whole systems response to crisis and change mitigation.\nSTAR-TIDES: SCIM is the underlying model for the US Department of Defense STAR-TIDES project on crisis response and humanitarian relief. (see Defense Horizons #70)`;
 
 export default function AdvancedInfrastructureMapper() {
   const [layers, setLayers] = useState<Layer[]>(defaultLayers);
@@ -762,10 +849,18 @@ export default function AdvancedInfrastructureMapper() {
   };
 
   const saveEditingLayer = () => {
-    if (editingLayerId && editingLayerName.trim()) {
-      updateLayerName(editingLayerId, editingLayerName);
-    }
-    cancelEditingLayer();
+    if (!editingLayerId || !editingLayerName.trim()) return;
+
+    setLayers((prev) =>
+      prev.map((layer) =>
+        layer.id === editingLayerId
+          ? { ...layer, name: editingLayerName.trim() }
+          : layer
+      )
+    );
+
+    setEditingLayerId(null);
+    setEditingLayerName("");
   };
 
   const startEditingElement = (elementId: string, currentName: string) => {
@@ -900,9 +995,69 @@ export default function AdvancedInfrastructureMapper() {
     setResizeHandle("resize");
   };
 
+  // Helper function to calculate polar coordinates
+  const calculatePolar = (
+    x: number,
+    y: number,
+    centerX: number,
+    centerY: number
+  ) => {
+    const dx = x - centerX;
+    const dy = y - centerY;
+    const r = Math.sqrt(dx * dx + dy * dy);
+    const theta = ((Math.atan2(dy, dx) * 180) / Math.PI + 360) % 360;
+    return { r, theta };
+  };
+
   const exportData = () => {
-    const data = { layers, threats, elements, connections, impactZones };
-    const blob = new Blob([JSON.stringify(data, null, 2)], {
+    // Convert elements to include polar coordinates
+    const enhancedElements = elements.map((element) => ({
+      ...element,
+      polar: calculatePolar(element.x, element.y, centerX, centerY),
+    }));
+
+    // Convert impact zones to include polar coordinates
+    const enhancedImpactZones = impactZones.map((zone) => ({
+      ...zone,
+      polar: calculatePolar(zone.x, zone.y, centerX, centerY),
+    }));
+
+    // Convert layers to normalized format
+    const layersMap = layers.reduce((acc, layer) => {
+      acc[layer.name] = layer;
+      return acc;
+    }, {} as Record<string, Layer>);
+
+    const exportData: InfrastructureMapExport = {
+      version: "2025-01-01",
+      coordinateSystem: {
+        type: "cartesian",
+        origin: "center",
+        units: "pixels",
+        centerX,
+        centerY,
+      },
+      defaults: {
+        distanceUnits: "px",
+        angleUnits: "deg",
+      },
+      layers: layersMap,
+      threats,
+      elements: enhancedElements,
+      connections,
+      impactZones: enhancedImpactZones,
+      metadata: {
+        exportedAt: new Date().toISOString(),
+        exportedBy: "SCIM Infrastructure Mapper",
+      },
+    };
+
+    // Validate export data before downloading
+    if (!validateExportBeforeDownload(exportData)) {
+      return; // Validation failed, don't proceed with download
+    }
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
       type: "application/json",
     });
     const url = URL.createObjectURL(blob);
@@ -921,13 +1076,29 @@ export default function AdvancedInfrastructureMapper() {
     reader.onload = (e) => {
       try {
         const data = JSON.parse(e.target?.result as string);
-        if (data.layers) setLayers(data.layers);
+
+        // Handle both old format (array) and new format (object) for layers
+        if (data.layers) {
+          if (Array.isArray(data.layers)) {
+            // Old format - layers is already an array
+            setLayers(data.layers);
+          } else {
+            // New format - layers is an object, convert to array
+            const layersArray = Object.values(data.layers) as Layer[];
+            setLayers(layersArray);
+          }
+        }
+
         if (data.threats) setThreats(data.threats);
         if (data.elements) setElements(data.elements);
         if (data.connections) setConnections(data.connections);
         if (data.impactZones) setImpactZones(data.impactZones);
+
+        // Show success message
+        alert("Data imported successfully!");
       } catch (error) {
         console.error("Failed to import data:", error);
+        alert("Failed to import data. Please check the file format.");
       }
     };
     reader.readAsText(file);
@@ -1052,7 +1223,7 @@ export default function AdvancedInfrastructureMapper() {
                 <Label className="text-sm font-medium">
                   Infrastructure Elements
                 </Label>
-                <div className="space-y-2 max-h-64 overflow-y-auto">
+                <div className="space-y-2 max-h-[calc(100vh-400px)] overflow-y-auto">
                   {scaledElements.map((element) => (
                     <div
                       key={element.id}
@@ -1207,7 +1378,7 @@ export default function AdvancedInfrastructureMapper() {
 
               <div className="space-y-2">
                 <Label className="text-sm font-medium">External Threats</Label>
-                <div className="space-y-2 max-h-64 overflow-y-auto">
+                <div className="space-y-2 max-h-[calc(100vh-400px)] overflow-y-auto">
                   {threats.map((threat) => (
                     <div
                       key={threat.id}
@@ -1267,7 +1438,7 @@ export default function AdvancedInfrastructureMapper() {
 
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Distance Layers</Label>
-                <div className="space-y-2 max-h-64 overflow-y-auto">
+                <div className="space-y-2 max-h-[calc(100vh-400px)] overflow-y-auto">
                   {scaledLayers.map((layer, index) => (
                     <div
                       key={layer.id}
@@ -1425,7 +1596,7 @@ export default function AdvancedInfrastructureMapper() {
 
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Impact Zones</Label>
-                <div className="space-y-2 max-h-64 overflow-y-auto">
+                <div className="space-y-2 max-h-[calc(100vh-400px)] overflow-y-auto">
                   {impactZones.map((zone) => (
                     <div
                       key={zone.id}
@@ -1529,7 +1700,7 @@ export default function AdvancedInfrastructureMapper() {
                   <Zap className="w-4 h-4" />
                   Infrastructure Connections
                 </Label>
-                <div className="space-y-2 max-h-80 overflow-y-auto">
+                <div className="space-y-2 max-h-[calc(100vh-400px)] overflow-y-auto">
                   {connections.map((connection) => {
                     const fromElement = scaledElements.find(
                       (el) => el.id === connection.from
@@ -1585,29 +1756,7 @@ export default function AdvancedInfrastructureMapper() {
               </div>
             </TabsContent>
           </div>
-
-          <div className="p-4 border-t bg-gray-50">
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Instructions</Label>
-              <div className="text-xs text-gray-600 space-y-1">
-                <p>• Drag elements to reposition them</p>
-                <p>• Click an element to start connecting</p>
-                <p>• Set connection type before linking</p>
-                <p>• Click connections to delete them</p>
-                <p>• Threats auto-create map segments</p>
-                <p>• Create custom impact zones with names</p>
-                <p>• Drag impact zones to move them</p>
-                <p>• Use resize handle to adjust zone size</p>
-                <p>• Toggle segments display</p>
-                <p>• Click layer names to edit them</p>
-                <p>• Use ↑↓ arrows to reorder layers</p>
-                <p>• Layers auto-resize to eliminate gaps</p>
-                <p>• Click element names to edit them</p>
-                <p>• Click impact zone names to edit them</p>
-                <p>• Drag red handles to resize segments</p>
-              </div>
-            </div>
-          </div>
+          <div className="p-4 border-t bg-gray-50"></div>
         </Tabs>
       </div>
     ),
@@ -1625,6 +1774,8 @@ export default function AdvancedInfrastructureMapper() {
       impactZones,
       selectedImpactZone,
       connections,
+      editingLayerId,
+      editingLayerName,
       addElement,
       addThreat,
       addLayer,
@@ -1634,8 +1785,13 @@ export default function AdvancedInfrastructureMapper() {
       deleteLayer,
       deleteImpactZone,
       deleteConnection,
+      startEditingLayer,
+      saveEditingLayer,
+      cancelEditingLayer,
     ]
   );
+
+  const [showLicense, setShowLicense] = useState(false);
 
   return (
     <div className="w-full h-screen flex flex-col lg:flex-row bg-gray-50">
@@ -1660,6 +1816,13 @@ export default function AdvancedInfrastructureMapper() {
             <h1 className="text-lg sm:text-xl font-bold">
               Critical Infrastructure Mapper
             </h1>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowLicense(true)}
+            >
+              View License
+            </Button>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button
@@ -2044,6 +2207,25 @@ export default function AdvancedInfrastructureMapper() {
       <div className="hidden lg:block w-96 bg-white border-l border-gray-200 overflow-y-auto">
         {ControlPanel()}
       </div>
+
+      {/* License Modal/Sheet */}
+      {showLicense && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-lg shadow-lg max-w-lg w-full p-6 relative">
+            <button
+              className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+              onClick={() => setShowLicense(false)}
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h2 className="text-lg font-bold mb-2">License & Authors</h2>
+            <pre className="whitespace-pre-wrap text-xs text-gray-700 mb-2">
+              {LICENSE_TEXT}
+            </pre>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
