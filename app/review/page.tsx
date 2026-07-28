@@ -1,5 +1,5 @@
-import { ScimProposalReview } from "@/components/scim-proposal-review";
+import { ScimCollaborationReview } from "@/components/scim-collaboration-review";
 
 export default function ReviewPage() {
-  return <ScimProposalReview />;
+  return <ScimCollaborationReview />;
 }
