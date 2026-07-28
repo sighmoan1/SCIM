@@ -1,6 +1,6 @@
 # Hospital resilience
 
-A portable example showing SCIM narrative context, infrastructure semantics, a scenario and a frozen radial layout that can be rendered identically by the application or passed to an AI conversation.
+A portable example showing SCIM narrative context, explicit dependency logic, scenarios and a frozen radial layout that can be rendered identically by the application or passed to an AI conversation.
 
 ```scim
 model hospital-resilience "Hospital resilience" {
@@ -45,6 +45,11 @@ model hospital-resilience "Hospital resilience" {
     mode: grid
     critical: true
     service-effects: [provision, quality]
+    requirement-group: hospital-power
+    requirement-service: electricity
+    requirement-policy: any
+    minimum-available: 1
+    when-unsatisfied: failed
   }
 
   generator -> hospital {
@@ -53,6 +58,11 @@ model hospital-resilience "Hospital resilience" {
     mode: on-site
     critical: true
     service-effects: [provision]
+    requirement-group: hospital-power
+    requirement-service: electricity
+    requirement-policy: any
+    minimum-available: 1
+    when-unsatisfied: failed
   }
 
   fuel-depot -> generator {
@@ -61,6 +71,10 @@ model hospital-resilience "Hospital resilience" {
     mode: delivery
     critical: true
     service-effects: [provision, cost]
+    requirement-group: generator-fuel
+    requirement-service: diesel
+    requirement-policy: all
+    when-unsatisfied: failed
   }
 
   hospital -> patient {
@@ -68,13 +82,23 @@ model hospital-resilience "Hospital resilience" {
     kind: protects
     critical: true
     service-effects: [provision, quality]
+    requirement-group: patient-care
+    requirement-service: emergency-care
+    requirement-policy: all
+    when-unsatisfied: failed
   }
 
-  scenario grid-failure "Regional grid failure" {
+  scenario grid-failure "Regional grid failure with working backup" {
     set grid status failed
     set relationship grid-hospital status failed
-    set hospital status degraded
     set generator status normal
+  }
+
+  scenario total-power-loss "Grid and backup generator unavailable" {
+    set grid status failed
+    set relationship grid-hospital status failed
+    set generator status failed
+    set relationship generator-hospital status failed
   }
 
   view main radial "Hospital resilience radial SCIM" {
@@ -115,6 +139,7 @@ model hospital-resilience "Hospital resilience" {
 
 ## Assumptions
 
+- Either the regional grid or the backup generator can meet the modelled hospital electricity requirement.
 - The generator starts successfully when grid power fails.
 - The stated fuel endurance assumes normal hospital demand.
 - Fuel resupply depends on the road network, which is not yet represented.
