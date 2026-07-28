@@ -7,7 +7,7 @@ This roadmap describes current capability and likely sequencing. It is not a pro
 ### Complete foundations
 
 - SCIM schema 0.2 and Zod validation;
-- portable Markdown and Mermaid-like SCIM DSL;
+- portable Markdown and Mermaid-like SCIM DSL for the implemented value subset;
 - canonical parser and serializer;
 - text-only structural projection for AI interpretation;
 - deterministic `scim-radial-1` SVG rendering;
@@ -26,7 +26,24 @@ This roadmap describes current capability and likely sequencing. It is not a pro
 - preserved legacy mapper at `/legacy`;
 - GitHub type-check/build verification and Vercel deployment.
 
+The exact implementation matrix is maintained in [`implementation-status.md`](implementation-status.md).
+
 ## Known limitations
+
+### Language and round-trip conformance
+
+The canonical schema is currently broader than the lossless SCIM DSL subset.
+
+Known gaps include:
+
+- entity and relationship evidence is accepted canonically but not parsed or emitted as first-class DSL;
+- scenario created/modified timestamps are not represented in DSL;
+- INAM cell notes are not represented in DSL;
+- nested object, null and mixed-array extension attributes do not round-trip losslessly;
+- escaped declaration titles and commas inside quoted list items are not robustly parsed;
+- post-parse schema errors are reported at line 1 rather than mapped to exact source lines;
+- `layout: automatic` has no automatic-layout engine;
+- the renderer currently omits unplaced entities rather than enforcing the normative missing-placement warning.
 
 ### Canonical visual editing
 
@@ -74,6 +91,8 @@ Current collaboration is one browser profile on one device. There is no:
 
 AI use currently relies on portable copy and paste. There is no embedded provider adapter, automatic source retrieval or tool protocol. This is intentional until provider disclosure and review controls are designed.
 
+Because evidence is not yet lossless in DSL, AI handoffs containing canonical evidence require extra review until explicit evidence syntax is implemented.
+
 ### Testing
 
 CI performs type-checking and production build. Comprehensive automated schema, parser, renderer, simulation, component and browser tests remain to be added.
@@ -93,6 +112,13 @@ The primary map has native touch support and labelled controls, but known gaps i
 Focus on correctness and recovery before adding major capability.
 
 - establish Vitest and golden SCIM round-trip tests;
+- add an evidence syntax or explicitly narrow the portable canonical contract;
+- make portable attribute value types lossless and tested;
+- add scenario timestamp and INAM cell-note syntax or remove them from the claimed portable surface;
+- improve quoted-string, escaped-title and list parsing;
+- map canonical validation errors back to source locations;
+- enforce or explicitly model radial-view visibility and missing placements;
+- clarify or remove `layout: automatic` until an algorithm exists;
 - add renderer snapshot tests for `scim-radial-1`;
 - add workspace persistence and undo tests;
 - add proposal partial-acceptance tests;
@@ -201,6 +227,7 @@ These should not be added until the core modelling semantics and review workflow
 6. Mobile and accessibility in each release, not as a final phase.
 7. Synthetic examples before operationally sensitive data.
 8. Maintain portable text even when richer services are added.
+9. Document schema/DSL conformance honestly before advertising round-trip support.
 
 ## How to update this roadmap
 
