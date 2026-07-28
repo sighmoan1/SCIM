@@ -27,6 +27,7 @@ This directory is the maintained guide to the Simple Critical Infrastructure Map
 - [`workspace-and-revisions.md`](workspace-and-revisions.md) — shared accepted state, human/AI provenance, local persistence and undo.
 - [`proposal-review.md`](proposal-review.md) — reviewable human and AI proposal workflow.
 - [`ai-collaboration-protocol.md`](ai-collaboration-protocol.md) — model-agnostic handoff, proposal and acceptance protocol.
+- [`action-planning-design.md`](action-planning-design.md) — proposed structured interventions, actions and plans of action; not yet implemented.
 - [`legacy-migration.md`](legacy-migration.md) — legacy format adapter, migration risks and retirement criteria.
 
 ## Build, maintain and govern the application
@@ -108,8 +109,9 @@ Normative documents use **MUST**, **SHOULD** and **MAY** in their usual standard
 2. `ai-collaboration-protocol.md`
 3. `proposal-review.md`
 4. `workspace-and-revisions.md`
-5. `implementation-status.md`
-6. `SECURITY.md`
+5. `action-planning-design.md`
+6. `implementation-status.md`
+7. `SECURITY.md`
 
 ### Mobile or interaction contributor
 
