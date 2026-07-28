@@ -10,3 +10,5 @@ export * from "./requirements";
 export * from "./diff";
 export * from "./diff-apply";
 export * from "./proposal";
+export * from "./workspace";
+export * from "./default-model";
