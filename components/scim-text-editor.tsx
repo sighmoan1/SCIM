@@ -1,7 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { parseScimDsl, ScimSyntaxError } from "@/lib/scim/parser";
+import {
+  parseScimDsl,
+  parseScimMarkdown,
+  ScimSyntaxError,
+} from "@/lib/scim/parser";
 import {
   serializeDot,
   serializeMermaid,
@@ -158,7 +162,10 @@ export function ScimTextEditor() {
 
   const result = useMemo(() => {
     try {
-      return { document: parseScimDsl(source), errors: [] as string[] };
+      const document = source.includes("```scim")
+        ? parseScimMarkdown(source)
+        : parseScimDsl(source);
+      return { document, errors: [] as string[] };
     } catch (error) {
       const errors =
         error instanceof ScimSyntaxError
