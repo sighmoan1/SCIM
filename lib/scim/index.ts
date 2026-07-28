@@ -7,3 +7,5 @@ export * from "./handoff";
 export * from "./radial-svg";
 export * from "./structure";
 export * from "./requirements";
+export * from "./diff";
+export * from "./proposal";
