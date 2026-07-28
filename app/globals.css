@@ -92,3 +92,60 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+.legacy-map-shell {
+  position: relative;
+  width: 100%;
+}
+
+.legacy-map-mobile-toolbar {
+  position: sticky;
+  top: 49px;
+  z-index: 80;
+  border-bottom: 1px solid hsl(var(--border));
+  background: hsl(var(--background) / 0.96);
+  padding: 0.5rem 0.75rem;
+  backdrop-filter: blur(10px);
+}
+
+.legacy-map-viewport {
+  width: 100%;
+  max-width: 100vw;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
+}
+
+.legacy-map-viewport[data-interaction-mode="navigate"] {
+  touch-action: pan-x pan-y pinch-zoom;
+}
+
+.legacy-map-viewport[data-interaction-mode="edit"] {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.legacy-map-stage {
+  min-width: 960px;
+}
+
+.legacy-map-stage button,
+.legacy-map-stage input,
+.legacy-map-stage select,
+.legacy-map-stage textarea {
+  touch-action: manipulation;
+}
+
+@media (min-width: 768px) {
+  .legacy-map-viewport {
+    max-width: none;
+    overflow: hidden;
+    touch-action: auto;
+  }
+
+  .legacy-map-stage {
+    min-width: 0;
+  }
+}
