@@ -18,6 +18,7 @@ This directory is the maintained guide to the Simple Critical Infrastructure Map
 - [`dependency-requirements.md`](dependency-requirements.md) — explicit all/any/threshold dependency semantics.
 - [`scenario-and-requirement-engine.md`](scenario-and-requirement-engine.md) — scenario application, requirement evaluation and propagation behaviour.
 - [`scim-radial-1.md`](scim-radial-1.md) — normative deterministic radial renderer profile.
+- [`library-api.md`](library-api.md) — exported parser, serializer, renderer, simulation, diff, proposal and workspace APIs.
 
 ## Workspaces and collaboration
 
@@ -27,9 +28,11 @@ This directory is the maintained guide to the Simple Critical Infrastructure Map
 - [`ai-collaboration-protocol.md`](ai-collaboration-protocol.md) — model-agnostic handoff, proposal and acceptance protocol.
 - [`legacy-migration.md`](legacy-migration.md) — legacy format adapter, migration risks and retirement criteria.
 
-## Build and maintain the application
+## Build, maintain and govern the application
 
 - [`../CONTRIBUTING.md`](../CONTRIBUTING.md) — contribution workflow, quality gates and coding expectations.
+- [`../AGENTS.md`](../AGENTS.md) — repository rules for future AI coding collaborators.
+- [`governance.md`](governance.md) — decision rights, roles and change levels.
 - [`development-and-release.md`](development-and-release.md) — local setup, scripts, CI, Vercel deployment, versioning and release checklist.
 - [`mobile-and-accessibility.md`](mobile-and-accessibility.md) — mobile interaction contract and accessibility acceptance criteria.
 - [`testing-strategy.md`](testing-strategy.md) — current verification, missing automated coverage and intended test pyramid.
@@ -41,6 +44,7 @@ This directory is the maintained guide to the Simple Critical Infrastructure Map
 
 Architecture decisions are captured under [`decisions/`](decisions/):
 
+- [`decisions/README.md`](decisions/README.md) — when and how to write an ADR.
 - [`0001-canonical-text-first-model.md`](decisions/0001-canonical-text-first-model.md)
 - [`0002-separate-semantics-from-views.md`](decisions/0002-separate-semantics-from-views.md)
 - [`0003-ai-output-is-a-proposal.md`](decisions/0003-ai-output-is-a-proposal.md)
@@ -82,8 +86,9 @@ Normative documents use **MUST**, **SHOULD** and **MAY** in their usual standard
 1. `CONTRIBUTING.md`
 2. `architecture.md`
 3. `canonical-model-reference.md`
-4. `development-and-release.md`
-5. the relevant subsystem guide
+4. `library-api.md`
+5. `development-and-release.md`
+6. the relevant subsystem guide
 
 ### Language or simulation contributor
 
@@ -107,3 +112,11 @@ Normative documents use **MUST**, **SHOULD** and **MAY** in their usual standard
 2. `mobile-and-accessibility.md`
 3. ADR 0005
 4. `testing-strategy.md`
+
+### Maintainer or release owner
+
+1. `governance.md`
+2. `CONTRIBUTING.md`
+3. `development-and-release.md`
+4. `SECURITY.md`
+5. `CHANGELOG.md`
