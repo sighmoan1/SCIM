@@ -3,3 +3,4 @@ export * from "./parser";
 export * from "./serializer";
 export * from "./simulation";
 export * from "./legacy-adapter";
+export * from "./handoff";
