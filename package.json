@@ -1,6 +1,6 @@
 {
   "name": "SCIM",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
