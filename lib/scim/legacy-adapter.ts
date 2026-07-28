@@ -100,6 +100,7 @@ const layerAliases: Record<string, string> = {
   municipality: "municipality",
   region: "region",
   country: "country",
+  international: "world",
   world: "world",
 };
 
@@ -114,12 +115,29 @@ const threatAliases: Record<string, string> = {
   "too-hot": "too-hot",
 };
 
+const failureModeAliases: Record<string, string> = {
+  Neglect: "neglect",
+  "Time and wear": "time-and-wear",
+  Operators: "operators",
+  "System Externalities": "system-externalities",
+  Economics: "economics",
+  "Violence / Disaster": "violence-or-disaster",
+};
+
+const serviceEffectAliases: Record<string, string> = {
+  "Service Unavailable": "provision",
+  "Service Cost Spike": "cost",
+  "Service Quality Drop": "quality",
+};
+
 function slugify(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "") || "unknown";
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "unknown"
+  );
 }
 
 function normaliseLayer(value: string): string {
@@ -162,20 +180,31 @@ export function legacyMapToScim(
     layerByLegacyIndex.set(index + 1, normaliseLayer(layer.name));
   });
 
-  const entities = legacy.elements.map((element) => ({
-    id: element.id,
-    name: element.name,
-    description: "",
-    kind: slugify(element.name),
-    layer: layerByLegacyIndex.get(element.layer) ?? "individual",
-    status: "normal" as const,
-    protectsAgainst: [] as string[],
-    attributes: {
-      legacyInfrastructureProblems: element.infrastructureProblems ?? [],
-      legacyOtherInfrastructureProblem: element.otherInfrastructureProblem,
-    },
-    evidence: [],
-  }));
+  const entities = legacy.elements.map((element) => {
+    const failureModes = (element.infrastructureProblems ?? [])
+      .map((problem) => failureModeAliases[problem])
+      .filter((value): value is string => Boolean(value));
+    const unrecognisedProblems = (element.infrastructureProblems ?? []).filter(
+      (problem) => !failureModeAliases[problem]
+    );
+
+    return {
+      id: element.id,
+      name: element.name,
+      description: "",
+      kind: slugify(element.name),
+      layer: layerByLegacyIndex.get(element.layer) ?? "individual",
+      status: "normal" as const,
+      supportsNeeds: [] as string[],
+      protectsAgainst: [] as string[],
+      failureModes,
+      attributes: {
+        legacyInfrastructureProblems: unrecognisedProblems,
+        legacyOtherInfrastructureProblem: element.otherInfrastructureProblem,
+      },
+      evidence: [],
+    };
+  });
 
   const relationships = legacy.connections.map((connection) => ({
     id: connection.id,
@@ -185,25 +214,65 @@ export function legacyMapToScim(
     deliveryMode: deliveryMode(connection.connectorType),
     status: "normal" as const,
     critical: false,
+    serviceEffects: (connection.impactEffects ?? [])
+      .map((effect) => serviceEffectAliases[effect])
+      .filter((value): value is string => Boolean(value)),
     attributes: {
       strength: connection.strength,
       notes: connection.notes,
-      impactEffects: connection.impactEffects ?? [],
+      legacyImpactEffects: (connection.impactEffects ?? []).filter(
+        (effect) => !serviceEffectAliases[effect]
+      ),
       otherImpactEffect: connection.otherImpactEffect,
     },
     evidence: [],
   }));
 
+  const width = Math.max(1, legacy.coordinateSystem.centerX * 2);
+  const height = Math.max(1, legacy.coordinateSystem.centerY * 2);
   const document = ScimDocumentSchema.parse({
-    schemaVersion: "0.1",
+    schemaVersion: "0.2",
     id: options.id ?? "imported-infrastructure-map",
     title: options.title ?? "Imported infrastructure map",
     description:
       options.description ??
       `Imported from legacy mapper export ${legacy.version}.`,
+    perspective: "individual",
     entities,
     relationships,
     scenarios: [],
+    views: [
+      {
+        id: "legacy-radial",
+        name: "Imported radial SCIM",
+        type: "radial",
+        renderer: "scim-radial-1",
+        layout: "frozen",
+        canvas: { width, height },
+        centre: {
+          x: legacy.coordinateSystem.centerX,
+          y: legacy.coordinateSystem.centerY,
+        },
+        showSegments: true,
+        rings: sortedLayers.map((layer) => ({
+          layer: normaliseLayer(layer.name),
+          radius: layer.radius,
+          labelAngle: -90,
+        })),
+        sectors: legacy.threats.map((threat) => ({
+          need: normaliseThreat(threat.name),
+          angle: ((threat.angle % 360) + 360) % 360,
+        })),
+        nodes: legacy.elements.map((element) => ({
+          entityId: element.id,
+          x: element.x,
+          y: element.y,
+          width: element.width ?? 80,
+          height: element.height ?? 30,
+        })),
+        routes: [],
+      },
+    ],
   });
 
   return {
@@ -255,11 +324,16 @@ export function scimToLegacyMap(
       y: layout.elements[entity.id]?.y ?? layout.coordinateSystem.centerY,
       width: layout.elements[entity.id]?.width,
       height: layout.elements[entity.id]?.height,
-      infrastructureProblems: Array.isArray(
-        entity.attributes.legacyInfrastructureProblems
-      )
-        ? (entity.attributes.legacyInfrastructureProblems as string[])
-        : undefined,
+      infrastructureProblems: [
+        ...entity.failureModes.map(
+          (mode) =>
+            Object.entries(failureModeAliases).find(([, value]) => value === mode)?.[0] ??
+            mode
+        ),
+        ...(Array.isArray(entity.attributes.legacyInfrastructureProblems)
+          ? (entity.attributes.legacyInfrastructureProblems as string[])
+          : []),
+      ],
       otherInfrastructureProblem:
         typeof entity.attributes.legacyOtherInfrastructureProblem === "string"
           ? entity.attributes.legacyOtherInfrastructureProblem
@@ -289,9 +363,16 @@ export function scimToLegacyMap(
         typeof relationship.attributes.notes === "string"
           ? relationship.attributes.notes
           : undefined,
-      impactEffects: Array.isArray(relationship.attributes.impactEffects)
-        ? (relationship.attributes.impactEffects as string[])
-        : undefined,
+      impactEffects: [
+        ...relationship.serviceEffects.map(
+          (effect) =>
+            Object.entries(serviceEffectAliases).find(([, value]) => value === effect)?.[0] ??
+            effect
+        ),
+        ...(Array.isArray(relationship.attributes.legacyImpactEffects)
+          ? (relationship.attributes.legacyImpactEffects as string[])
+          : []),
+      ],
       otherImpactEffect:
         typeof relationship.attributes.otherImpactEffect === "string"
           ? relationship.attributes.otherImpactEffect
