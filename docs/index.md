@@ -8,6 +8,7 @@ This directory is the maintained guide to the Simple Critical Infrastructure Map
 - [`user-guide.md`](user-guide.md) — current end-user journeys across Map, Model, Review and Legacy routes.
 - [`product-and-domain.md`](product-and-domain.md) — what SCIM is, the problems it addresses and the product principles that must survive implementation changes.
 - [`architecture.md`](architecture.md) — current system architecture and data flow.
+- [`implementation-status.md`](implementation-status.md) — exact implemented capability and known schema/DSL/UI contract gaps.
 - [`glossary.md`](glossary.md) — domain and implementation terminology.
 
 ## Model, language and simulation
@@ -79,24 +80,27 @@ Normative documents use **MUST**, **SHOULD** and **MAY** in their usual standard
 1. `README.md`
 2. `user-guide.md`
 3. `product-and-domain.md`
-4. `roadmap.md`
+4. `implementation-status.md`
+5. `roadmap.md`
 
 ### New engineer
 
 1. `CONTRIBUTING.md`
 2. `architecture.md`
 3. `canonical-model-reference.md`
-4. `library-api.md`
-5. `development-and-release.md`
-6. the relevant subsystem guide
+4. `implementation-status.md`
+5. `library-api.md`
+6. `development-and-release.md`
+7. the relevant subsystem guide
 
 ### Language or simulation contributor
 
 1. `scim-language.md`
 2. `canonical-model-reference.md`
-3. `dependency-requirements.md`
-4. `scenario-and-requirement-engine.md`
-5. `testing-strategy.md`
+3. `implementation-status.md`
+4. `dependency-requirements.md`
+5. `scenario-and-requirement-engine.md`
+6. `testing-strategy.md`
 
 ### AI collaboration contributor
 
@@ -104,7 +108,8 @@ Normative documents use **MUST**, **SHOULD** and **MAY** in their usual standard
 2. `ai-collaboration-protocol.md`
 3. `proposal-review.md`
 4. `workspace-and-revisions.md`
-5. `SECURITY.md`
+5. `implementation-status.md`
+6. `SECURITY.md`
 
 ### Mobile or interaction contributor
 
@@ -118,5 +123,6 @@ Normative documents use **MUST**, **SHOULD** and **MAY** in their usual standard
 1. `governance.md`
 2. `CONTRIBUTING.md`
 3. `development-and-release.md`
-4. `SECURITY.md`
-5. `CHANGELOG.md`
+4. `implementation-status.md`
+5. `SECURITY.md`
+6. `CHANGELOG.md`
