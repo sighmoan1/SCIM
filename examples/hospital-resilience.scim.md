@@ -1,9 +1,13 @@
 # Hospital resilience
 
-A minimal example showing narrative context alongside an editable SCIM model.
+A portable example showing SCIM narrative context, infrastructure semantics, a scenario and a frozen radial layout that can be rendered identically by the application or passed to an AI conversation.
 
 ```scim
 model hospital-resilience "Hospital resilience" {
+  perspective: individual
+  focus: patient
+  description: "How a patient remains protected during a regional electricity failure."
+
   entity patient "Patient" {
     kind: person
     layer: individual
@@ -12,51 +16,99 @@ model hospital-resilience "Hospital resilience" {
   entity hospital "Hospital" {
     kind: healthcare
     layer: municipality
-    protects-against: [injury, illness]
+    supports: [injury, illness]
+    failure-modes: [operators, system-externalities]
   }
 
   entity grid "Electricity grid" {
     kind: power
     layer: region
+    failure-modes: [time-and-wear, system-externalities, violence-or-disaster]
   }
 
   entity generator "Backup generator" {
     kind: power
     layer: municipality
+    failure-modes: [neglect, operators]
     fuel-hours: 36
   }
 
   entity fuel-depot "Fuel depot" {
     kind: fuel
     layer: region
+    failure-modes: [system-externalities, economics]
   }
 
   grid -> hospital {
+    id: grid-hospital
     kind: supplies
     mode: grid
     critical: true
+    service-effects: [provision, quality]
   }
 
   generator -> hospital {
+    id: generator-hospital
     kind: backup-for
     mode: on-site
     critical: true
+    service-effects: [provision]
   }
 
   fuel-depot -> generator {
+    id: fuel-generator
     kind: supplies
     mode: delivery
     critical: true
+    service-effects: [provision, cost]
   }
 
   hospital -> patient {
+    id: hospital-patient
     kind: protects
     critical: true
+    service-effects: [provision, quality]
   }
 
   scenario grid-failure "Regional grid failure" {
     set grid status failed
+    set relationship grid-hospital status failed
+    set hospital status degraded
     set generator status normal
+  }
+
+  view main radial "Hospital resilience radial SCIM" {
+    renderer: scim-radial-1
+    layout: frozen
+    canvas: 1000 1000
+    centre: 500 500
+    segments: true
+
+    ring individual radius 70
+    ring household radius 130
+    ring neighbourhood radius 190
+    ring municipality radius 250
+    ring region radius 310
+    ring country radius 370
+    ring world radius 430
+
+    sector injury angle 210
+    sector illness angle 270
+    sector thirst angle 330
+    sector hunger angle 30
+    sector too-hot angle 90
+    sector too-cold angle 150
+
+    place patient at 500 500 size 100 36
+    place hospital at 370 420 size 120 40
+    place generator at 615 430 size 120 40
+    place grid at 720 290 size 120 40
+    place fuel-depot at 780 520 size 110 40
+
+    route grid-hospital via 720 290, 560 340, 370 420
+    route generator-hospital via 615 430, 500 425, 370 420
+    route fuel-generator via 780 520, 700 475, 615 430
+    route hospital-patient via 370 420, 440 460, 500 500
   }
 }
 ```
