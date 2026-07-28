@@ -17,12 +17,23 @@ function heading(markdown: string): string {
 }
 
 function section(markdown: string, names: string[]): string {
-  const escaped = names.map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  const pattern = new RegExp(
-    `^##\\s+(?:${escaped.join("|")})\\s*$([\\s\\S]*?)(?=^##\\s+|^\\x60\\x60\\x60scim|$)`,
-    "im"
-  );
-  return markdown.match(pattern)?.[1]?.trim() ?? "";
+  const expected = new Set(names.map((name) => name.toLowerCase()));
+  const lines = markdown.split(/\r?\n/);
+  let collecting = false;
+  const collected: string[] = [];
+
+  for (const line of lines) {
+    const sectionMatch = line.match(/^##\s+(.+)$/);
+    if (sectionMatch) {
+      if (collecting) break;
+      collecting = expected.has(sectionMatch[1].trim().toLowerCase());
+      continue;
+    }
+    if (collecting && line.trim().startsWith("```scim")) break;
+    if (collecting) collected.push(line);
+  }
+
+  return collected.join("\n").trim();
 }
 
 function bullets(value: string): string[] {
