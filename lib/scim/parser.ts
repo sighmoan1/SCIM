@@ -12,8 +12,49 @@ export class ScimSyntaxError extends Error {
   }
 }
 
+type Draft = Record<string, any>;
+
+type CurrentBlock =
+  | { type: "entity"; value: Draft }
+  | { type: "relationship"; value: Draft }
+  | { type: "scenario"; value: Draft }
+  | { type: "radial-view"; value: Draft }
+  | { type: "inam-view"; value: Draft };
+
+function stripComment(value: string): string {
+  let quoted = false;
+  let escaped = false;
+
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (character === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (character === '"') {
+      quoted = !quoted;
+      continue;
+    }
+    if (character === "#" && !quoted) return value.slice(0, index);
+  }
+
+  return value;
+}
+
 function unquote(value: string): string {
-  return value.trim().replace(/^"|"$/g, "");
+  const trimmed = value.trim();
+  if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+    try {
+      return JSON.parse(trimmed) as string;
+    } catch {
+      return trimmed.slice(1, -1);
+    }
+  }
+  return trimmed;
 }
 
 function parseScalar(value: string): unknown {
@@ -22,13 +63,34 @@ function parseScalar(value: string): unknown {
   if (trimmed === "false") return false;
   if (/^-?\d+(\.\d+)?$/.test(trimmed)) return Number(trimmed);
   if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
-    return trimmed
-      .slice(1, -1)
-      .split(",")
-      .map((item) => unquote(item))
-      .filter(Boolean);
+    return parseList(trimmed);
   }
   return unquote(trimmed);
+}
+
+function parseList(value: string): string[] {
+  const trimmed = value.trim();
+  const body = trimmed.startsWith("[") && trimmed.endsWith("]")
+    ? trimmed.slice(1, -1)
+    : trimmed;
+
+  return body
+    .split(",")
+    .map((item) => unquote(item))
+    .filter(Boolean);
+}
+
+function parsePoints(value: string): Array<{ x: number; y: number }> | null {
+  const points = value.split(",").map((item) => item.trim());
+  const parsed: Array<{ x: number; y: number }> = [];
+
+  for (const point of points) {
+    const match = point.match(/^(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)$/);
+    if (!match) return null;
+    parsed.push({ x: Number(match[1]), y: Number(match[2]) });
+  }
+
+  return parsed.length >= 2 ? parsed : null;
 }
 
 export function extractScimBlocks(markdown: string): string[] {
@@ -46,7 +108,7 @@ export function parseScimMarkdown(markdown: string): ScimDocument {
   }
   if (blocks.length > 1) {
     throw new ScimSyntaxError([
-      { line: 1, message: "Version 0.1 supports one scim model per document" },
+      { line: 1, message: "Language version 0.2 supports one scim model per document" },
     ]);
   }
   return parseScimDsl(blocks[0]);
@@ -55,25 +117,27 @@ export function parseScimMarkdown(markdown: string): ScimDocument {
 export function parseScimDsl(source: string): ScimDocument {
   const lines = source.split(/\r?\n/);
   const errors: ScimParseError[] = [];
-  const entities: Array<Record<string, unknown>> = [];
-  const relationships: Array<Record<string, unknown>> = [];
-  const scenarios: Array<Record<string, unknown>> = [];
-  let model: { id: string; title: string } | undefined;
-  let current:
-    | { type: "entity"; value: Record<string, unknown> }
-    | { type: "relationship"; value: Record<string, unknown> }
-    | { type: "scenario"; value: Record<string, unknown> }
-    | undefined;
+  const entities: Draft[] = [];
+  const relationships: Draft[] = [];
+  const scenarios: Draft[] = [];
+  const views: Draft[] = [];
+  let model: Draft | undefined;
+  let current: CurrentBlock | undefined;
   let relationshipCounter = 0;
 
   lines.forEach((rawLine, index) => {
     const lineNumber = index + 1;
-    const line = rawLine.replace(/#.*$/, "").trim();
+    const line = stripComment(rawLine).trim();
     if (!line) return;
 
     const modelMatch = line.match(/^model\s+([\w-]+)\s+"([^"]+)"\s*\{$/);
     if (modelMatch) {
-      model = { id: modelMatch[1], title: modelMatch[2] };
+      model = {
+        id: modelMatch[1],
+        title: modelMatch[2],
+        description: "",
+        perspective: "individual",
+      };
       return;
     }
 
@@ -86,7 +150,9 @@ export function parseScimDsl(source: string): ScimDocument {
         kind: "service",
         layer: "individual",
         status: "normal",
+        supportsNeeds: [],
         protectsAgainst: [],
+        failureModes: [],
         attributes: {},
         evidence: [],
       };
@@ -104,6 +170,7 @@ export function parseScimDsl(source: string): ScimDocument {
         kind: "depends-on",
         status: "normal",
         critical: false,
+        serviceEffects: [],
         attributes: {},
         evidence: [],
       };
@@ -125,43 +192,265 @@ export function parseScimDsl(source: string): ScimDocument {
       return;
     }
 
+    const viewMatch = line.match(
+      /^view\s+([\w-]+)\s+(radial|inam)\s+"([^"]+)"\s*\{$/
+    );
+    if (viewMatch) {
+      const [, id, type, name] = viewMatch;
+      if (type === "radial") {
+        const value = {
+          id,
+          name,
+          type: "radial",
+          renderer: "scim-radial-1",
+          layout: "automatic",
+          canvas: { width: 1000, height: 1000 },
+          centre: { x: 500, y: 500 },
+          showSegments: true,
+          rings: [],
+          sectors: [],
+          nodes: [],
+          routes: [],
+        };
+        views.push(value);
+        current = { type: "radial-view", value };
+      } else {
+        const value = {
+          id,
+          name,
+          type: "inam",
+          renderer: "scim-inam-1",
+          rowNeeds: [],
+          columns: [],
+          cells: [],
+        };
+        views.push(value);
+        current = { type: "inam-view", value };
+      }
+      return;
+    }
+
     if (line === "}") {
       if (current) current = undefined;
       return;
     }
 
     if (current?.type === "scenario") {
-      const statusMatch = line.match(/^set\s+([\w-]+)\s+status\s+(normal|degraded|failed|new)$/);
-      if (statusMatch) {
-        (current.value.changes as unknown[]).push({
+      const relationshipStatusMatch = line.match(
+        /^set\s+relationship\s+([\w-]+)\s+status\s+(normal|degraded|failed|new)$/
+      );
+      if (relationshipStatusMatch) {
+        current.value.changes.push({
+          operation: "set-relationship-status",
+          relationshipId: relationshipStatusMatch[1],
+          status: relationshipStatusMatch[2],
+        });
+        return;
+      }
+
+      const entityStatusMatch = line.match(
+        /^set(?:\s+entity)?\s+([\w-]+)\s+status\s+(normal|degraded|failed|new)$/
+      );
+      if (entityStatusMatch) {
+        current.value.changes.push({
           operation: "set-entity-status",
-          entityId: statusMatch[1],
-          status: statusMatch[2],
+          entityId: entityStatusMatch[1],
+          status: entityStatusMatch[2],
+        });
+        return;
+      }
+
+      const addEntityMatch = line.match(
+        /^add\s+entity\s+([\w-]+)\s+"([^"]+)"\s+kind\s+([\w-]+)\s+layer\s+([\w-]+)$/
+      );
+      if (addEntityMatch) {
+        current.value.changes.push({
+          operation: "add-entity",
+          entity: {
+            id: addEntityMatch[1],
+            name: addEntityMatch[2],
+            description: "",
+            kind: addEntityMatch[3],
+            layer: addEntityMatch[4],
+            status: "new",
+            supportsNeeds: [],
+            protectsAgainst: [],
+            failureModes: [],
+            attributes: {},
+            evidence: [],
+          },
+        });
+        return;
+      }
+
+      const addRelationshipMatch = line.match(
+        /^add\s+relationship\s+([\w-]+)\s*->\s*([\w-]+)\s+id\s+([\w-]+)\s+kind\s+([\w-]+)(?:\s+mode\s+([\w-]+))?(?:\s+critical\s+(true|false))?$/
+      );
+      if (addRelationshipMatch) {
+        current.value.changes.push({
+          operation: "add-relationship",
+          relationship: {
+            id: addRelationshipMatch[3],
+            from: addRelationshipMatch[1],
+            to: addRelationshipMatch[2],
+            kind: addRelationshipMatch[4],
+            deliveryMode: addRelationshipMatch[5],
+            status: "new",
+            critical: addRelationshipMatch[6] === "true",
+            serviceEffects: [],
+            attributes: {},
+            evidence: [],
+          },
+        });
+        return;
+      }
+    }
+
+    if (current?.type === "radial-view") {
+      const ringMatch = line.match(
+        /^ring\s+([\w-]+)\s+radius\s+(-?\d+(?:\.\d+)?)(?:\s+label-angle\s+(-?\d+(?:\.\d+)?))?$/
+      );
+      if (ringMatch) {
+        current.value.rings.push({
+          layer: ringMatch[1],
+          radius: Number(ringMatch[2]),
+          labelAngle: ringMatch[3] ? Number(ringMatch[3]) : -90,
+        });
+        return;
+      }
+
+      const sectorMatch = line.match(
+        /^sector\s+([\w-]+)\s+angle\s+(\d+(?:\.\d+)?)$/
+      );
+      if (sectorMatch) {
+        current.value.sectors.push({
+          need: sectorMatch[1],
+          angle: Number(sectorMatch[2]),
+        });
+        return;
+      }
+
+      const placementMatch = line.match(
+        /^place\s+([\w-]+)\s+at\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)(?:\s+size\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?))?$/
+      );
+      if (placementMatch) {
+        current.value.nodes.push({
+          entityId: placementMatch[1],
+          x: Number(placementMatch[2]),
+          y: Number(placementMatch[3]),
+          width: placementMatch[4] ? Number(placementMatch[4]) : 100,
+          height: placementMatch[5] ? Number(placementMatch[5]) : 36,
+        });
+        return;
+      }
+
+      const routeMatch = line.match(/^route\s+([\w-]+)\s+via\s+(.+)$/);
+      if (routeMatch) {
+        const points = parsePoints(routeMatch[2]);
+        if (!points) {
+          errors.push({
+            line: lineNumber,
+            message: "A route requires at least two comma-separated x y points",
+          });
+        } else {
+          current.value.routes.push({
+            relationshipId: routeMatch[1],
+            points,
+          });
+        }
+        return;
+      }
+    }
+
+    if (current?.type === "inam-view") {
+      const cellMatch = line.match(
+        /^cell\s+([\w-]+)\s+([\w-]+)\s*:\s*(\[[^\]]*\])$/
+      );
+      if (cellMatch) {
+        current.value.cells.push({
+          rowNeed: cellMatch[1],
+          column: cellMatch[2],
+          entityIds: parseList(cellMatch[3]),
         });
         return;
       }
     }
 
     const propertyMatch = line.match(/^([\w-]+)\s*:\s*(.+)$/);
-    if (propertyMatch && current) {
+    if (propertyMatch) {
       const [, key, rawValue] = propertyMatch;
       const value = parseScalar(rawValue);
-      if (current.type === "entity") {
+
+      if (!current && model) {
+        if (key === "perspective") model.perspective = value;
+        else if (key === "focus") model.focusEntityId = value;
+        else if (key === "description") model.description = value;
+        else errors.push({ line: lineNumber, message: `Unknown model property: ${key}` });
+        return;
+      }
+
+      if (current?.type === "entity") {
         if (key === "kind") current.value.kind = value;
         else if (key === "layer") current.value.layer = value;
         else if (key === "status") current.value.status = value;
         else if (key === "description") current.value.description = value;
+        else if (key === "supports") current.value.supportsNeeds = value;
         else if (key === "protects-against") current.value.protectsAgainst = value;
-        else (current.value.attributes as Record<string, unknown>)[key] = value;
-      } else if (current.type === "relationship") {
+        else if (key === "failure-modes") current.value.failureModes = value;
+        else current.value.attributes[key] = value;
+        return;
+      }
+
+      if (current?.type === "relationship") {
         if (key === "id") current.value.id = value;
         else if (key === "kind") current.value.kind = value;
         else if (key === "mode") current.value.deliveryMode = value;
         else if (key === "status") current.value.status = value;
         else if (key === "critical") current.value.critical = value;
-        else (current.value.attributes as Record<string, unknown>)[key] = value;
-      } else if (key === "description") current.value.description = value;
-      return;
+        else if (key === "service-effects") current.value.serviceEffects = value;
+        else current.value.attributes[key] = value;
+        return;
+      }
+
+      if (current?.type === "scenario") {
+        if (key === "description") current.value.description = value;
+        else errors.push({ line: lineNumber, message: `Unknown scenario property: ${key}` });
+        return;
+      }
+
+      if (current?.type === "radial-view") {
+        if (key === "renderer") current.value.renderer = value;
+        else if (key === "layout") current.value.layout = value;
+        else if (key === "segments") current.value.showSegments = value;
+        else if (key === "canvas") {
+          const match = rawValue.match(/^(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)$/);
+          if (match) {
+            current.value.canvas = { width: Number(match[1]), height: Number(match[2]) };
+          } else {
+            errors.push({ line: lineNumber, message: "canvas must be: width height" });
+          }
+        } else if (key === "centre" || key === "center") {
+          const match = rawValue.match(
+            /^(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)$/
+          );
+          if (match) {
+            current.value.centre = { x: Number(match[1]), y: Number(match[2]) };
+          } else {
+            errors.push({ line: lineNumber, message: "centre must be: x y" });
+          }
+        } else {
+          errors.push({ line: lineNumber, message: `Unknown radial view property: ${key}` });
+        }
+        return;
+      }
+
+      if (current?.type === "inam-view") {
+        if (key === "renderer") current.value.renderer = value;
+        else if (key === "rows") current.value.rowNeeds = value;
+        else if (key === "columns") current.value.columns = value;
+        else errors.push({ line: lineNumber, message: `Unknown INAM view property: ${key}` });
+        return;
+      }
     }
 
     errors.push({ line: lineNumber, message: `Could not parse: ${line}` });
@@ -171,13 +460,16 @@ export function parseScimDsl(source: string): ScimDocument {
   if (errors.length) throw new ScimSyntaxError(errors);
 
   const parsed = ScimDocumentSchema.safeParse({
-    schemaVersion: "0.1",
+    schemaVersion: "0.2",
     id: model!.id,
     title: model!.title,
-    description: "",
+    description: model!.description,
+    perspective: model!.perspective,
+    focusEntityId: model!.focusEntityId,
     entities,
     relationships,
     scenarios,
+    views,
   });
 
   if (!parsed.success) {
