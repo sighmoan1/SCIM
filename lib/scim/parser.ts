@@ -93,6 +93,25 @@ function parsePoints(value: string): Array<{ x: number; y: number }> | null {
   return parsed.length >= 2 ? parsed : null;
 }
 
+function parseJsonLine(
+  value: string,
+  line: number,
+  label: string,
+  errors: ScimParseError[]
+): unknown | undefined {
+  try {
+    return JSON.parse(value);
+  } catch (error) {
+    errors.push({
+      line,
+      message: `${label} must contain valid JSON: ${
+        error instanceof Error ? error.message : "invalid JSON"
+      }`,
+    });
+    return undefined;
+  }
+}
+
 export function extractScimBlocks(markdown: string): string[] {
   const blocks: string[] = [];
   const pattern = /```scim\s*\n([\s\S]*?)```/g;
@@ -257,6 +276,39 @@ export function parseScimDsl(source: string): ScimDocument {
           entityId: entityStatusMatch[1],
           status: entityStatusMatch[2],
         });
+        return;
+      }
+
+      const addEntityJsonMatch = line.match(/^add\s+entity-json\s+(.+)$/);
+      if (addEntityJsonMatch) {
+        const entity = parseJsonLine(
+          addEntityJsonMatch[1],
+          lineNumber,
+          "entity-json",
+          errors
+        );
+        if (entity !== undefined) {
+          current.value.changes.push({ operation: "add-entity", entity });
+        }
+        return;
+      }
+
+      const addRelationshipJsonMatch = line.match(
+        /^add\s+relationship-json\s+(.+)$/
+      );
+      if (addRelationshipJsonMatch) {
+        const relationship = parseJsonLine(
+          addRelationshipJsonMatch[1],
+          lineNumber,
+          "relationship-json",
+          errors
+        );
+        if (relationship !== undefined) {
+          current.value.changes.push({
+            operation: "add-relationship",
+            relationship,
+          });
+        }
         return;
       }
 
