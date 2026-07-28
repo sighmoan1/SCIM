@@ -36,7 +36,7 @@ The standard SCIM layers are:
 6. `country`
 7. `world`
 
-The original terms "village", "town / city" and "international" are accepted aliases. The layer records the practical level at which a resource is owned, controlled or supplied; it is not merely a drawing ring.
+The original terms “village”, “town / city” and “international” are accepted aliases. The layer records the practical level at which a resource is owned, controlled or supplied; it is not merely a drawing ring.
 
 ### 1.3 Cooperation perspectives
 
@@ -71,9 +71,9 @@ Standard infrastructure failure modes are:
 
 Standard service effects are:
 
-- `provision` - whether the service is available;
-- `cost` - whether the service remains affordable;
-- `quality` - whether the service remains safe and adequate.
+- `provision` — whether the service is available;
+- `cost` — whether the service remains affordable;
+- `quality` — whether the service remains safe and adequate.
 
 Standard delivery paths are:
 
@@ -108,6 +108,8 @@ model hospital-resilience "Hospital resilience" {
 
 The fenced block is the machine-readable source of truth. Narrative outside the block is useful context but MUST NOT silently alter the model.
 
+Language version 0.2 supports exactly one fenced SCIM model per Markdown document.
+
 Identifiers use lowercase letters, numbers and hyphens. They are stable references and SHOULD NOT be renamed merely to improve wording.
 
 ## 3. Core grammar
@@ -118,6 +120,7 @@ Identifiers use lowercase letters, numbers and hyphens. They are stable referenc
 model hospital-resilience "Hospital resilience" {
   perspective: individual
   focus: patient
+  description: "Minimum services required to protect a hospital patient."
 }
 ```
 
@@ -132,10 +135,20 @@ entity hospital "District Hospital" {
   supports: [injury, illness]
   failure-modes: [operators, system-externalities]
   beds: 180
+  emergency-capable: true
 }
 ```
 
-Unknown properties are preserved as typed attributes. This permits local extensions without changing the core grammar.
+Unknown properties are preserved as extension attributes when their values use the portable SCIM 0.2 value subset:
+
+- string;
+- number;
+- boolean;
+- list of strings.
+
+The canonical JSON schema permits richer unknown values, but nested objects, null values and mixed nested arrays are not losslessly represented by the current DSL parser and serializer. See [`implementation-status.md`](implementation-status.md).
+
+The canonical entity schema also contains an `evidence` array. SCIM DSL 0.2 does not yet define first-class evidence syntax, so evidence is currently canonical-JSON-only and is not preserved by a DSL round trip.
 
 ### 3.3 Relationships
 
@@ -151,10 +164,55 @@ grid -> hospital {
 
 The arrow points from the providing or enabling entity to the receiving entity. The renderer MUST preserve this direction.
 
-### 3.4 Scenarios
+Relationship extension attributes use the same portable scalar and string-list value subset as entity attributes.
+
+The canonical relationship schema contains an `evidence` array, but SCIM DSL 0.2 does not yet have first-class relationship evidence syntax.
+
+### 3.4 Explicit dependency requirements
+
+Several incoming relationships do not by themselves define whether every provider is required, any provider is sufficient, or a minimum threshold is needed.
+
+SCIM 0.2 declares this through consistent relationship attributes:
+
+```scim
+grid -> hospital {
+  id: grid-hospital
+  kind: supplies
+  critical: true
+  requirement-group: hospital-power
+  requirement-service: electricity
+  requirement-policy: any
+  minimum-available: 1
+  when-unsatisfied: failed
+}
+
+generator -> hospital {
+  id: generator-hospital
+  kind: backup-for
+  critical: true
+  requirement-group: hospital-power
+  requirement-service: electricity
+  requirement-policy: any
+  minimum-available: 1
+  when-unsatisfied: failed
+}
+```
+
+Supported policies are:
+
+- `all` — every relationship in the group must be available;
+- `any` — at least one relationship must be available;
+- `at-least` — at least `minimum-available` relationships must be available.
+
+All relationships in one group should point to the same target and declare consistent policy, threshold, service and unsatisfied status.
+
+Incoming relationships without `requirement-group` remain logically unspecified. A person or AI must not infer AND/OR semantics from layout.
+
+### 3.5 Scenarios
 
 ```scim
 scenario grid-failure "Regional grid failure" {
+  description: "The regional electricity service is unavailable."
   set grid status failed
   set relationship grid-hospital status failed
   set hospital status degraded
@@ -163,9 +221,22 @@ scenario grid-failure "Regional grid failure" {
 
 A scenario is a set of changes to the baseline. It does not copy the entire map.
 
-### 3.5 Views
+Supported operation forms include:
 
-The semantic model and its visual layout are separate. A document may contain multiple views.
+```scim
+set entity-id status failed
+set relationship relationship-id status failed
+add entity new-id "New service" kind service layer municipality
+add relationship provider -> receiver id new-link kind supplies critical true
+```
+
+Complex added entities and relationships may be serialised as JSON-bearing scenario statements by the current implementation.
+
+The canonical scenario schema accepts optional created and modified timestamps, but SCIM DSL 0.2 does not currently parse or emit them.
+
+### 3.6 Views
+
+The semantic model and visual layout are separate. A document may contain multiple views.
 
 ```scim
 view main radial "Individual SCIM" {
@@ -200,6 +271,8 @@ view main radial "Individual SCIM" {
 
 A radial view uses explicit SCIM units in an SVG-style canvas. The application scales the canvas responsively but does not alter its internal geometry.
 
+`layout: automatic` is accepted by the current schema, but an automatic layout algorithm is not yet implemented. Portable diagrams should use `layout: frozen` and declare every visible placement.
+
 An INAM view fixes row and column order and records the entities present in each cell:
 
 ```scim
@@ -212,7 +285,50 @@ view national-inam inam "Integrated Needs Analysis" {
 }
 ```
 
-## 4. Exact rendering contract
+The canonical INAM cell schema accepts an optional note, but current SCIM 0.2 `cell` syntax does not parse or emit it.
+
+## 4. Portable value grammar
+
+The current portable attribute value grammar is deliberately small.
+
+### Strings
+
+A simple identifier-like string may be unquoted:
+
+```scim
+resource: electricity
+```
+
+Other strings use double quotes:
+
+```scim
+note: "Requires a verified local source"
+```
+
+Current parser limitations mean escaped quotation marks inside declaration titles and commas inside quoted list items are not robustly supported. Keep portable labels simple until the parser is upgraded.
+
+### Numbers
+
+```scim
+beds: 180
+confidence-percent: 75.5
+```
+
+### Booleans
+
+```scim
+critical: true
+```
+
+### Lists
+
+```scim
+supports: [injury, illness]
+```
+
+Lists are currently parsed as strings. Nested objects and arrays are outside the lossless DSL 0.2 subset.
+
+## 5. Exact rendering contract
 
 A logical model may be rendered in many useful ways. An identical portable diagram requires a `frozen` view.
 
@@ -231,17 +347,21 @@ A compliant `scim-radial-1` renderer MUST:
 
 This provides stable geometry and a visually equivalent SVG across the SCIM application and capable chat interfaces. Font rasterisation may vary slightly between operating systems, so the guarantee is layout-equivalent rather than byte-identical pixels.
 
-A `frozen` radial view SHOULD place every visible entity. A renderer MUST report missing placements rather than silently producing a different automatic arrangement.
+A `frozen` radial view SHOULD place every visible entity. A compliant renderer SHOULD report missing placements rather than silently generating a different automatic arrangement.
 
-## 5. AI handoff protocol
+The current renderer validates declared references but presently omits unplaced entities instead of reporting them. This is a documented conformance gap, not intended normative behaviour.
+
+## 6. AI handoff protocol
 
 The application exports a self-contained Markdown handoff. A person can paste it into a chat and ask an AI to review, extend or render the model.
 
 The handoff tells the AI to:
 
 - treat the `scim` block as authoritative;
+- read the text-only structural projection before geometry;
 - preserve identifiers and frozen geometry unless explicitly asked to change them;
 - distinguish facts, assumptions and proposals;
+- use explicit dependency requirement policies;
 - return a complete updated `scim` block rather than an unstructured description;
 - explain every proposed semantic change;
 - render frozen radial views according to `scim-radial-1` when SVG or HTML output is supported;
@@ -249,9 +369,11 @@ The handoff tells the AI to:
 
 The same handoff can be imported back into SCIM. Human and AI changes therefore pass through one validated language rather than being applied invisibly by a chatbot.
 
-## 6. Canonicalisation
+Because evidence is not yet lossless in SCIM DSL 0.2, a handoff containing canonical evidence must be reviewed carefully. The generated structural section may display evidence that the authoritative DSL cannot currently re-encode.
 
-The serializer is normative for ordering and formatting:
+## 7. Canonicalisation
+
+The serializer defines ordering and formatting:
 
 1. model metadata;
 2. entities in document order;
@@ -259,10 +381,31 @@ The serializer is normative for ordering and formatting:
 4. scenarios in document order;
 5. views in document order.
 
-A tool may reformat whitespace, but MUST preserve IDs, values, source order and frozen geometry. Unknown entity and relationship attributes MUST survive a parse/serialize round trip.
+A tool may reformat whitespace, but MUST preserve IDs, values, source order where defined and frozen geometry.
 
-## 7. Versioning
+Portable scalar and string-list extension attributes MUST survive a parse/serialize round trip. Rich canonical JSON attributes, evidence, scenario timestamps and INAM cell notes do not currently have that guarantee in DSL 0.2.
+
+## 8. Implementation conformance
+
+The canonical schema is broader than the currently implemented text grammar in several places. The exact matrix and known gaps are maintained in [`implementation-status.md`](implementation-status.md).
+
+Important current gaps are:
+
+- no first-class evidence syntax;
+- no scenario timestamp syntax;
+- no INAM cell-note syntax;
+- no lossless nested attribute values;
+- no automatic layout engine;
+- incomplete missing-placement enforcement;
+- limited escaped-string and list parsing;
+- post-parse schema errors mapped to line 1 rather than exact source lines.
+
+These gaps must be stated honestly and addressed with compatibility decisions and tests.
+
+## 9. Versioning
 
 The language version is the document `schemaVersion`. Renderer profiles are versioned independently, for example `scim-radial-1`.
 
 A breaking grammar or semantic change increments the schema major version. A renderer profile is never silently changed after publication; a revised algorithm receives a new profile identifier.
+
+Application releases may improve editors, collaboration or mobile interaction without changing either schema or renderer version.

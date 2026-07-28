@@ -1,53 +1,63 @@
-# Mobile map interaction modes
+# Legacy mobile compatibility layer
 
-The original radial mapper was written around desktop mouse events and a desktop-sized canvas. Replacing its internal state and handlers will take an incremental migration because the component also contains the current manual editing workflow.
+Status: historical documentation for application 0.4.1. Superseded on the primary route by the canonical native-Pointer-Events workspace in 0.5.0.
 
-SCIM 0.4.1 introduces a compatibility shell so the existing mapper is usable on touch devices without removing desktop editing.
+Current contributors should read [`mobile-and-accessibility.md`](mobile-and-accessibility.md) and [`canonical-workspace.md`](canonical-workspace.md).
+
+## Why the compatibility layer existed
+
+The original radial mapper was written around desktop mouse events and a desktop-sized canvas. SCIM 0.4.1 added a temporary shell so the existing mapper could be used on touch devices without removing desktop editing while the canonical migration was built.
+
+The historical implementation remains relevant at `/legacy`.
 
 ## Navigate mode
 
-Navigate mode is the mobile default.
+Navigate mode was the mobile default.
 
-- The full map retains a desktop-sized working surface rather than being compressed into an unreadable phone-width diagram.
-- The viewport can be panned using normal touch scrolling.
-- Browser pinch zoom remains available.
-- **Centre** scrolls the working surface back to its centre.
-- Normal form controls and buttons keep native touch behaviour.
+- The full map retained a desktop-sized working surface instead of being compressed into an unreadable phone-width diagram.
+- The viewport could be panned using normal touch scrolling.
+- Browser pinch zoom remained available.
+- **Centre** returned the working surface to its centre.
+- Normal form controls and buttons kept native touch behaviour.
 
 ## Edit map mode
 
-Edit mode translates one active touch pointer into the mouse events expected by the legacy mapper.
+Edit mode translated one active touch pointer into mouse events expected by the legacy mapper.
 
-- One-finger drag moves existing draggable map objects.
-- A tap produces the existing click interaction.
-- A double-tap produces the existing double-click interaction for editors which still depend on it.
-- Pointer capture keeps a drag active when the finger leaves the original SVG object.
-- Form controls, links and dialogs are excluded from the translation layer.
+- One-finger drag moved existing draggable objects.
+- A tap generated the existing click interaction.
+- A double-tap generated the existing double-click interaction.
+- Pointer capture kept a drag active outside the original SVG object.
+- Form controls, links and dialogs were excluded from translation.
 
-The two-mode design prevents an ordinary attempt to pan around the diagram from accidentally moving infrastructure objects.
+This reduced accidental movement while panning, but retained the legacy event and state architecture.
 
-## Accessibility
+## Why it was superseded
 
-The toolbar uses native buttons with `aria-pressed` state. Mode changes and centring actions are announced through an `aria-live` region.
+The compatibility approach had unavoidable limitations:
 
-The compatibility layer does not change keyboard or mouse behaviour on desktop.
+- touch events were translated into mouse events;
+- the legacy mapper still owned semantic and layout state privately;
+- manual edits did not naturally enter the canonical human/AI history;
+- essential editing inherited hover, double-click and small-handle assumptions;
+- scenarios remained copied maps;
+- interaction behaviour was difficult to reason about and test.
 
-## Limitations
+## Current architecture
 
-This release is a compatibility step, not the final mobile architecture:
+Application 0.5.0 replaced the primary `/` route with:
 
-- the legacy mapper still owns domain and layout state inside one large React component;
-- object editing still inherits some desktop-oriented dialogs and small SVG handles;
-- map zoom is browser-level rather than a canonical view transform;
-- two-finger map-specific pinch and pan are not yet modelled as persistent view state;
-- the compatibility bridge should eventually disappear as the mapper adopts pointer events directly.
+- direct `ScimDocument` editing;
+- native Pointer Events for mouse, touch and pen;
+- pointer capture on node drags;
+- explicit Navigate and Edit modes;
+- touch-sized node hit targets;
+- one canonical revision per completed drag;
+- read-only scenario previews;
+- shared human/AI accepted state and history.
 
-## Next migration
+The touch-to-mouse bridge remains only as part of the preserved legacy route and should not be copied into new canonical controls.
 
-The next stage should move the radial mapper onto the canonical `ScimDocument` plus a separate view object. Direct pointer-event handlers can then update a reviewable operation log shared by manual edits and AI proposals. That will allow:
+## Historical lesson
 
-1. native one-finger selection and explicit move mode;
-2. persistent pan and zoom;
-3. larger touch handles and contextual bottom sheets;
-4. undo and revision history;
-5. manual changes represented by the same structured diff used for AI proposals.
+A compatibility bridge can preserve working capability during an incremental migration, but it should have an explicit retirement target. Mobile support is complete only when the underlying state and interaction model are mobile-native, not when touch is converted into desktop events.

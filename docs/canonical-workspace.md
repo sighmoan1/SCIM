@@ -1,48 +1,261 @@
 # Canonical map workspace
 
-The primary map now edits a `ScimDocument` directly. It no longer relies on translated touch events or on the legacy mapper's private React state.
+Status: current behaviour of the primary `/` route in SCIM Mapper v0.5.0.
 
-## One accepted model
+## Purpose
 
-The Map, Model and Review workspaces share one browser-local accepted document.
+The canonical map is the primary visual authoring surface. It edits a validated `ScimDocument` directly and shares accepted state and revision history with the Review workspace.
 
-- Manual map edits change the canonical entities, relationships or radial view.
-- AI responses are complete candidate documents.
-- Both are compared with `compareScimDocuments`.
-- Both produce the same `ScimDocumentChange` operations.
-- Accepted operations are stored in one revision history with an origin of `human` or `ai`.
+It replaces the original assumption that the visual editor’s private React state is the model.
 
-An AI never edits the accepted map invisibly. The Review workspace applies only the operations explicitly selected by the human reviewer.
+## Workspace layout
+
+The route combines:
+
+- the radial map;
+- Navigate and Edit map modes;
+- selected-entity inspection and editing;
+- entity creation;
+- directed relationship creation and deletion;
+- scenario selection and read-only simulated display;
+- simulation warnings and explanations;
+- revision history and undo;
+- SCIM copy, download and AI-handoff actions.
+
+The exact arrangement is responsive and may evolve. The state and interaction rules below are the stable contract.
+
+## One accepted document
+
+The map loads the browser-local workspace through `loadScimWorkspace`.
+
+The accepted document is:
+
+- validated with `ScimDocumentSchema`;
+- rendered through a frozen radial view;
+- used as the baseline for scenarios;
+- used as the baseline for proposal review;
+- saved after accepted changes;
+- exported as authoritative SCIM text.
+
+Manual map editing, text portability and AI proposal review therefore refer to the same model shape.
+
+## Default model
+
+When no valid stored document exists, the map loads the validated demonstration model from `lib/scim/default-model.ts`.
+
+The fallback is not intended as a claim about a real infrastructure system. It is a synthetic example showing entities, directed dependencies, a scenario and a frozen radial view.
 
 ## Native pointer interaction
 
-The primary map uses Pointer Events directly:
+The map uses Pointer Events directly for mouse, touch and pen.
 
-- mouse, touch and pen use the same handlers;
-- the dragged node captures its pointer until completion;
-- node movement updates only the frozen radial view placement;
-- a completed drag records one canonical view revision rather than one revision per movement frame;
-- Navigate mode leaves browser scrolling and pinch zoom available;
-- Edit mode uses explicit node hit targets of at least 48 by 48 units.
+### Navigate mode
 
-Scenario previews are read-only. This prevents a user from accidentally changing the baseline while looking at a simulated result.
+Navigate is the safe default.
 
-## Manual capabilities
+- Browser scrolling and panning remain available.
+- Pinch zoom remains available.
+- The user can inspect the model without accidentally moving nodes.
 
-The canonical map supports:
+### Edit map mode
 
-- selecting, moving, editing, adding and deleting entities;
-- adding and deleting directed relationships;
-- editing entity kind, locality layer, status and supported needs;
-- baseline and scenario preview;
-- simulation explanations;
-- undoing the latest accepted revision;
-- copying or downloading authoritative SCIM;
-- copying the text-first AI handoff;
-- reviewing an AI proposal against the exact accepted workspace baseline.
+- Pointer down on a node begins a drag.
+- The node captures the active pointer.
+- Pointer coordinates are converted into the declared SCIM canvas.
+- Movement changes only that node’s placement in the selected frozen radial view.
+- The node remains within canvas bounds.
+- Pointer up or cancellation ends the drag.
+- One completed drag creates one human-origin view revision.
 
-The complete original mapper remains at `/legacy` while specialist controls such as impact-zone editing and threat-sector editing are migrated onto canonical state.
+Scenario previews cannot be dragged.
+
+## Selection and inspection
+
+Selecting an entity loads its canonical values into the inspector.
+
+Current editable fields include:
+
+- name;
+- kind;
+- locality/control layer;
+- status;
+- supported needs.
+
+Saving creates a validated human-origin revision.
+
+The inspector should remain explicit about semantic fields. Position and size belong to the view, not the entity.
+
+## Entity creation
+
+Creating an entity:
+
+1. normalises the requested ID or derives one safely;
+2. creates canonical semantic fields;
+3. adds a placement to the radial view;
+4. validates the resulting complete document;
+5. records one human-origin revision;
+6. selects the new entity.
+
+A future richer creator should capture evidence, failure modes, description and attributes without changing this transactional behaviour.
+
+## Entity deletion
+
+Deleting an entity must remove or update every dependent reference required to keep the document valid, including:
+
+- relationships whose source or target is the entity;
+- radial view node placements;
+- routed relationship geometry for removed relationships;
+- focus reference when the deleted entity was the focus;
+- scenario or INAM references when those capabilities are exposed for deletion.
+
+The resulting complete document is validated before acceptance.
+
+## Relationship creation
+
+Relationships are directed from provider or enabler to receiver.
+
+Current creation captures:
+
+- source entity;
+- target entity;
+- relationship kind;
+- criticality.
+
+The resulting relationship receives a stable ID, is added to the canonical document, validated and recorded as a human-origin semantic revision.
+
+Future relationship editing should expose delivery mode, service effects, dependency requirement metadata, evidence and notes.
+
+## Relationship deletion
+
+Deleting a relationship removes:
+
+- the canonical relationship;
+- any radial route that refers to it;
+- scenario or requirement references where applicable.
+
+The complete result must remain valid.
+
+## Rendering and interaction overlay
+
+The visible map is generated by `serializeScimRadialSvg` according to `scim-radial-1`.
+
+The interactive workspace overlays transparent or minimally visible SVG hit targets associated with stable entity IDs. These targets provide touch-sized interaction without changing the normative renderer output.
+
+This separates:
+
+- deterministic exported SVG;
+- application interaction controls.
+
+## Scenario preview
+
+Selecting a scenario:
+
+1. applies its explicit operations with `applyScenario`;
+2. runs dependency propagation with `propagateCriticalFailures`;
+3. renders the resulting document using the same radial view;
+4. displays warnings and explanations;
+5. disables baseline editing.
+
+The preview does not replace the accepted document or create a revision.
+
+## Revision history
+
+Every accepted manual action uses the same comparison logic as reviewed AI work.
+
+A human revision records:
+
+- label;
+- `human` origin;
+- timestamp;
+- canonical changes;
+- complete before and after documents.
+
+A completed drag is view-only. Entity or relationship edits are semantic. The history displays the distinction through the recorded operations.
+
+The current map keeps and stores the latest 100 revisions.
+
+See [`workspace-and-revisions.md`](workspace-and-revisions.md).
+
+## Undo
+
+Undo restores the `before` snapshot of the latest accepted revision and removes that revision from active history.
+
+Current undo is linear and local. There is no redo or branch history yet.
+
+## Copy and export
+
+The workspace can produce:
+
+- authoritative SCIM DSL;
+- downloaded `.scim` source;
+- a text-first AI handoff.
+
+Export is the current durable backup and cross-device exchange mechanism.
+
+## Review integration
+
+The Review action opens `/review`, which loads the same accepted local workspace baseline.
+
+After a person selects valid candidate operations and accepts them, the Review workspace stores:
+
+- the accepted candidate result;
+- one AI-origin revision.
+
+Returning to the map loads the updated shared workspace.
 
 ## Persistence
 
-The accepted document and the latest 100 revisions are stored in local storage. They are not uploaded to an AI provider by the map. A user chooses when to copy a portable handoff into an external chat.
+The map stores:
+
+- `scim.workspace.document.v1`;
+- `scim.workspace.revisions.v1`.
+
+Local storage is browser- and device-specific, not encrypted and not a reliable backup. See [`workspace-and-revisions.md`](workspace-and-revisions.md) and [`../SECURITY.md`](../SECURITY.md).
+
+## Mobile behaviour
+
+- Navigate mode supports browser panning and pinch zoom.
+- Edit mode supports one-pointer node movement.
+- Node hit targets are at least 48 by 48 view units.
+- Essential editing actions are available through visible controls rather than hover.
+- Scenario previews are read-only.
+
+See [`mobile-and-accessibility.md`](mobile-and-accessibility.md).
+
+## Legacy route
+
+The complete original mapper remains at `/legacy` while the following specialist capabilities are migrated:
+
+- threat-sector and layer editing;
+- impact zones;
+- node resizing;
+- routed connections;
+- richer legacy scenario controls;
+- remaining import/export compatibility.
+
+New product capability should target canonical state rather than extending the legacy private model.
+
+## Current limitations
+
+- Source editing and accepted workspace replacement are not yet a single explicit transaction.
+- Node keyboard movement is not implemented.
+- Edge route manipulation and resizing are not implemented.
+- Impact zones are not yet represented in the canonical schema.
+- Collaboration is local to one browser.
+- The current scenario engine is status-based rather than time- or resource-based.
+- Automated browser tests are not yet established.
+
+## Contributor checklist for map changes
+
+Before merging:
+
+1. identify the canonical fields changed;
+2. confirm semantic versus view behaviour;
+3. validate complete documents at the boundary;
+4. preserve stable IDs;
+5. record one clear revision per accepted action;
+6. confirm scenario preview remains read-only;
+7. test mouse, touch and pen-compatible pointer behaviour;
+8. test narrow mobile layouts;
+9. run `pnpm verify`;
+10. update this guide and the roadmap when capability changes.
