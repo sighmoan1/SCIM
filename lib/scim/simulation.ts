@@ -3,12 +3,17 @@ import {
   type ScimDocument,
   type ScimScenario,
 } from "./schema";
+import {
+  evaluateDependencyRequirements,
+  extractDependencyRequirements,
+} from "./requirements";
 
 export interface SimulationResult {
   document: ScimDocument;
   changedEntityIds: string[];
   changedRelationshipIds: string[];
   warnings: string[];
+  explanations: string[];
 }
 
 export function applyScenario(
@@ -35,6 +40,7 @@ export function applyScenario(
   const changedEntityIds = new Set<string>();
   const changedRelationshipIds = new Set<string>();
   const warnings: string[] = [];
+  const explanations: string[] = [];
 
   for (const change of scenario.changes) {
     if (change.operation === "set-entity-status") {
@@ -45,6 +51,9 @@ export function applyScenario(
       }
       entity.status = change.status;
       changedEntityIds.add(entity.id);
+      explanations.push(
+        `Scenario ${scenario.id} sets entity ${entity.id} to ${change.status}.`
+      );
       continue;
     }
 
@@ -56,12 +65,16 @@ export function applyScenario(
       }
       relationship.status = change.status;
       changedRelationshipIds.add(relationship.id);
+      explanations.push(
+        `Scenario ${scenario.id} sets relationship ${relationship.id} to ${change.status}.`
+      );
       continue;
     }
 
     if (change.operation === "add-entity") {
       entities.set(change.entity.id, structuredClone(change.entity));
       changedEntityIds.add(change.entity.id);
+      explanations.push(`Scenario ${scenario.id} adds entity ${change.entity.id}.`);
       continue;
     }
 
@@ -70,6 +83,9 @@ export function applyScenario(
       structuredClone(change.relationship)
     );
     changedRelationshipIds.add(change.relationship.id);
+    explanations.push(
+      `Scenario ${scenario.id} adds relationship ${change.relationship.id}.`
+    );
   }
 
   return {
@@ -82,6 +98,7 @@ export function applyScenario(
     changedEntityIds: [...changedEntityIds],
     changedRelationshipIds: [...changedRelationshipIds],
     warnings,
+    explanations,
   };
 }
 
@@ -91,10 +108,17 @@ export interface PropagationOptions {
   maximumPasses?: number;
 }
 
+function uniquePush(values: string[], value: string): void {
+  if (!values.includes(value)) values.push(value);
+}
+
 /**
- * Conservative deterministic propagation. An entity fails only when every
- * incoming critical dependency is failed. This avoids pretending SCIM knows
- * capacities or redundancy that have not been explicitly modelled.
+ * Deterministic propagation with two modes:
+ *
+ * 1. Explicit requirement groups define whether all, any, or at least N
+ *    incoming providers are needed.
+ * 2. Entities without an explicit requirement retain the conservative legacy
+ *    rule: they fail only when every incoming critical dependency is unavailable.
  */
 export function propagateCriticalFailures(
   input: ScimDocument,
@@ -109,14 +133,44 @@ export function propagateCriticalFailures(
   const changedEntityIds = new Set<string>();
   const changedRelationshipIds = new Set<string>();
   const warnings: string[] = [];
+  const explanations: string[] = [];
 
   const entities = new Map(document.entities.map((entity) => [entity.id, entity]));
+  const explicitRequirementTargets = new Set(
+    extractDependencyRequirements(document).requirements.map(
+      (requirement) => requirement.targetEntityId
+    )
+  );
 
   for (let pass = 0; pass < maximumPasses; pass += 1) {
     let changed = false;
+    const requirementResult = evaluateDependencyRequirements(document);
+    requirementResult.warnings.forEach((warning) => uniquePush(warnings, warning));
+
+    for (const evaluation of requirementResult.evaluations) {
+      if (evaluation.satisfied) continue;
+      const target = entities.get(evaluation.targetEntityId);
+      if (!target || target.status === "failed") continue;
+
+      const nextStatus = evaluation.whenUnsatisfied;
+      const shouldChange =
+        nextStatus === "failed" ||
+        target.status === "normal" ||
+        target.status === "new";
+      if (!shouldChange || target.status === nextStatus) continue;
+
+      target.status = nextStatus;
+      changedEntityIds.add(target.id);
+      explanations.push(
+        `${evaluation.explanation} Entity ${target.id} becomes ${nextStatus}.`
+      );
+      changed = true;
+    }
 
     for (const entity of document.entities) {
       if (entity.status === "failed") continue;
+      if (explicitRequirementTargets.has(entity.id)) continue;
+
       const incoming = document.relationships.filter(
         (relationship) =>
           relationship.to === entity.id &&
@@ -136,6 +190,9 @@ export function propagateCriticalFailures(
       if (allUnavailable) {
         entity.status = "failed";
         changedEntityIds.add(entity.id);
+        explanations.push(
+          `Entity ${entity.id} fails because all ${incoming.length} incoming critical dependencies are unavailable and no explicit requirement policy is declared.`
+        );
         incoming.forEach((relationship) => {
           if (relationship.status !== "failed") {
             relationship.status = "failed";
@@ -157,5 +214,6 @@ export function propagateCriticalFailures(
     changedEntityIds: [...changedEntityIds],
     changedRelationshipIds: [...changedRelationshipIds],
     warnings,
+    explanations,
   };
 }
