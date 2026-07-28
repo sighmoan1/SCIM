@@ -2,73 +2,130 @@
 
 ## Product decision
 
-SCIM should be easy for people and AI systems to author, while retaining a validated machine-readable model.
+SCIM is a shared language for understanding how infrastructure and social organisation protect people, how services depend on each other, and what happens under stress. It is not a generic diagram editor with SCIM labels added afterwards.
 
-The project therefore uses four layers:
+The product must support three equal authors:
 
-1. **SCIM Markdown** — the document people edit. It contains narrative, assumptions, evidence and fenced `scim` blocks.
-2. **SCIM DSL** — a compact Mermaid-like notation for entities, dependencies, scenarios and interventions.
-3. **Canonical JSON model** — the validated source of truth used by the application, APIs and simulations.
-4. **Views** — dependency diagrams, radial SCIM maps, INAM matrices, geographic maps and scenario timelines.
+1. a person editing the model visually;
+2. a person editing the model as text;
+3. an AI proposing reviewable changes through the same text and schema.
+
+No author writes directly into an unreviewed private state. Every accepted change becomes part of one canonical SCIM document.
+
+## SCIM semantic foundation
+
+The canonical vocabulary is grounded in the original SCIM framework:
+
+- the six immediate threats to life: too hot, too cold, hunger, thirst, illness and injury;
+- the three service families: shelter, supply and safety;
+- seven locality and control layers from individual to world / international;
+- four cooperation perspectives: individual, group, organisation and nation state;
+- group needs: communications, transport, space and resource control;
+- organisation needs: shared map, shared plan and shared succession;
+- nation-state needs: jurisdiction, citizens, territory, effective organisations and international recognition;
+- six infrastructure failure modes;
+- provision, cost and quality as the three service effects;
+- on-site, grid, delivery and fetch as service delivery paths;
+- radial SCIM maps and Integrated Needs Analysis Matrix (INAM) views.
+
+Extensions are permitted, but they must not erase these core distinctions.
+
+## Four product layers
+
+1. **SCIM Markdown** - the portable document people save, share and paste into conversations. Narrative, evidence, assumptions and open questions surround a fenced `scim` block.
+2. **SCIM DSL** - a compact Mermaid-like notation for entities, dependencies, scenarios and explicit views.
+3. **Canonical model** - the Zod-validated source of truth used by the application, APIs and simulations.
+4. **Versioned views** - radial SCIM, INAM, dependency graphs and future timelines or geographic views.
 
 ```text
 .scim.md document
-      ↓ parse
+      |
+      v
+SCIM parser and validation
+      |
+      v
 canonical SCIM model
-      ├── radial map
-      ├── dependency graph
-      ├── INAM matrix
-      ├── scenario comparison
-      └── JSON / Mermaid / DOT export
+      |-- radial view: scim-radial-1
+      |-- INAM view: scim-inam-1
+      |-- dependency graph
+      |-- scenario engine
+      |-- AI handoff
+      `-- JSON / SVG / Mermaid / DOT export
 ```
 
 ## Core design rules
 
-- Keep domain data separate from visual layout.
-- Give every entity and relationship a stable ID.
-- Model dependencies as directed relationships.
-- Keep scenarios as changes to a baseline model rather than duplicated maps.
-- Record evidence, confidence and assumptions alongside claims.
-- Treat the six SCIM threats and seven locality layers as controlled vocabularies that may be extended.
-- Validate all imported and exported data.
-- Preserve round-trip conversion between DSL and JSON.
+- Keep infrastructure meaning separate from visual layout.
+- Give every entity, relationship, scenario and view a stable ID.
+- Model dependencies as directed relationships from provider or enabler to recipient.
+- Keep scenarios as changes to a baseline rather than duplicated maps.
+- Preserve evidence, confidence, assumptions and provenance alongside claims.
+- Preserve unknown typed attributes during parse / serialize round trips.
+- Version the language separately from rendering algorithms.
+- Never silently change the geometry of a frozen view.
+- Treat AI output as a proposal until a person accepts it.
+- Make the same portable source usable by the application and external AI chat interfaces.
 
-## Proposed source structure
+## Portable rendering
+
+A semantic model can have many valid diagrams. Exact portability therefore lives in a view, not in the entity graph.
+
+A `frozen` radial view declares:
+
+- renderer profile;
+- canvas and centre;
+- ring order and radii;
+- threat sector angles;
+- node positions and dimensions;
+- optional routed relationship points.
+
+`scim-radial-1` turns that declaration into a deterministic SVG. The same DSL block can be rendered inside SCIM, exported as SVG, or pasted into an AI conversation with the renderer instructions generated by `serializeScimAiHandoff`.
+
+The renderer profile is immutable. An improved algorithm receives a new identifier rather than changing old diagrams.
+
+## AI collaboration boundary
+
+The application exports a self-contained AI handoff containing:
+
+- concise SCIM semantics;
+- exact renderer instructions;
+- the complete authoritative `scim` block;
+- rules to preserve IDs and frozen geometry;
+- instructions to distinguish evidence, assumptions and proposals;
+- a requirement to return a complete updated model.
+
+This lets people work with an embedded assistant, ChatGPT, Claude, a local model or another organisational AI without allowing conversational prose to mutate the model invisibly.
+
+The next collaboration layer will add typed proposals and review operations. The model and view language established here is the required substrate for that work.
+
+## Source structure
 
 ```text
 lib/scim/
-  schema.ts       Zod schemas and TypeScript types
-  parser.ts       SCIM DSL → canonical model
-  serializer.ts   canonical model → SCIM DSL
-  simulation.ts   scenario application and failure propagation
-  layout.ts       visual coordinates derived from the logical model
+  schema.ts          canonical schemas and controlled vocabularies
+  parser.ts          SCIM DSL -> canonical model
+  serializer.ts      canonical model -> SCIM DSL
+  radial-svg.ts      deterministic scim-radial-1 renderer
+  handoff.ts         portable AI conversation package
+  simulation.ts      scenario application and failure propagation
+  legacy-adapter.ts  migration from the original React mapper format
+
+components/
+  scim-text-editor.tsx
+  scim-radial-preview.tsx
 
 examples/
-  *.scim.md       executable examples and fixtures
+  *.scim.md          executable portable models
 ```
 
-## Migration from the current mapper
+## Migration from the existing mapper
 
-The existing mapper already contains useful domain concepts, but they currently live inside the React component and mix model state with screen coordinates.
+The original radial mapper remains a valuable manual editing interface, but its React state still mixes infrastructure meaning and screen geometry. Migration remains incremental:
 
-Migration should happen incrementally:
+1. Convert its data to `ScimDocument` plus a frozen radial view at the import / export boundary.
+2. Replace mouse-only handlers with pointer events and mobile pan / zoom.
+3. Make manual edits produce canonical model and view operations.
+4. Place text, visual and AI proposal editing in one workspace.
+5. Add revision history, proposal review and collaborative persistence.
 
-1. Extract the canonical schemas and types.
-2. Add adapters from the current export format to the canonical model.
-3. Move default SCIM data into fixtures.
-4. Make the visual editor consume the canonical model plus a separate layout object.
-5. Add the text parser and serializer.
-6. Add scenario propagation after round-trip editing is reliable.
-
-## First usable release
-
-A first release should allow a user to:
-
-- open an example `.scim.md` document;
-- edit the text and see the map update;
-- edit the map and see the text update;
-- validate errors with clear line references;
-- export canonical JSON, Mermaid and DOT;
-- create a scenario that degrades or removes entities and dependencies.
-
-Advanced simulation, real-time collaboration and AI assistance come after this round-trip authoring loop works.
+Manual mapping is retained. It becomes one authoring method for the same portable source rather than a separate data model.

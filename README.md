@@ -1,7 +1,29 @@
-# Simple infrastructure mapper
+# Simple Critical Infrastructure Mapper (SCIM)
 
 [![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/sighmoan1s-projects/v0-simple-infrastructure-mapper)
 
+SCIM helps people understand how infrastructure and social organisation protect life, how services depend on one another, and what happens when those systems degrade or fail.
+
+The application supports:
+
+- the original radial SCIM mapping interface;
+- a portable Markdown and Mermaid-like SCIM language;
+- validated entities, dependencies, needs, failure modes and scenarios;
+- frozen radial views that render deterministically as SVG;
+- Integrated Needs Analysis Matrix (INAM) view data;
+- portable AI handoffs that can be pasted into a chat and returned to the application without losing IDs or diagram geometry.
+
+## Use
+
+- `/` - original visual radial mapper
+- `/editor` - portable SCIM source, validation, scenario application, deterministic radial preview and exports
+
+## Language and architecture
+
+- [`docs/scim-language.md`](docs/scim-language.md) - SCIM 0.2 language and semantic vocabulary
+- [`docs/scim-radial-1.md`](docs/scim-radial-1.md) - normative deterministic radial SVG renderer
+- [`docs/architecture.md`](docs/architecture.md) - application and human/AI collaboration architecture
+- [`examples/hospital-resilience.scim.md`](examples/hospital-resilience.scim.md) - executable portable example
 
 ## License
 
