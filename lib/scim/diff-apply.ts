@@ -13,9 +13,15 @@ function applyById<T extends { id: string }>(
   kind: "added" | "removed" | "changed"
 ): T[] {
   if (kind === "removed") return current.filter((item) => item.id !== id);
-  const next = candidate.find((item) => item.id === id);
-  if (!next) return current;
-  return [...current.filter((item) => item.id !== id), structuredClone(next)];
+  const replacement = candidate.find((item) => item.id === id);
+  if (!replacement) return current;
+
+  const currentIndex = current.findIndex((item) => item.id === id);
+  if (currentIndex < 0) return [...current, structuredClone(replacement)];
+
+  return current.map((item, index) =>
+    index === currentIndex ? structuredClone(replacement) : item
+  );
 }
 
 export function applySelectedScimChanges(
