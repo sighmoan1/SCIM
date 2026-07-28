@@ -24,6 +24,8 @@ The project is not a generic flowchart editor and does not treat a chatbot respo
 
 These versions are independent. A product release does not automatically change the portable language or deterministic renderer contract.
 
+SCIM is pre-1.0. The canonical schema is currently broader than the lossless DSL subset; exact conformance and round-trip gaps are documented in [`docs/implementation-status.md`](docs/implementation-status.md).
+
 ## Use the application
 
 Production:
@@ -51,10 +53,12 @@ Infrastructure meaning is separate from diagram layout. An AI can interpret the 
 - locality/control layers;
 - individual, group, organisational and state perspectives;
 - needs, failure modes, delivery modes and service effects;
-- evidence, confidence and extensible typed attributes;
+- canonical evidence, confidence and extensible attributes;
 - explicit dependency requirement policies;
 - scenarios as changes to a baseline;
 - radial and INAM view data.
+
+Evidence exists in the canonical JSON schema, but SCIM DSL 0.2 does not yet preserve it losslessly. Portable text currently supports scalar and string-list extension attributes. See the implementation-status guide before relying on richer round trips.
 
 ### Manual visual editing
 
@@ -147,9 +151,9 @@ Verify a change:
 pnpm verify
 ```
 
-This runs TypeScript checking and a production Next.js build.
+This runs TypeScript checking and a production Next.js build. It is not yet comprehensive automated test coverage.
 
-Read [`CONTRIBUTING.md`](CONTRIBUTING.md) before changing schema, language, rendering, persistence, mobile interaction or AI review behaviour.
+Read [`CONTRIBUTING.md`](CONTRIBUTING.md) before changing schema, language, rendering, persistence, mobile interaction or AI review behaviour. AI coding collaborators should also read [`AGENTS.md`](AGENTS.md).
 
 ## Documentation
 
@@ -157,9 +161,13 @@ Start with [`docs/index.md`](docs/index.md).
 
 Key documents:
 
+- [`docs/user-guide.md`](docs/user-guide.md) — current user journeys;
 - [`docs/product-and-domain.md`](docs/product-and-domain.md) — purpose, SCIM concepts and product principles;
 - [`docs/architecture.md`](docs/architecture.md) — current application architecture and data flow;
+- [`docs/implementation-status.md`](docs/implementation-status.md) — exact capability and known contract gaps;
+- [`docs/canonical-model-reference.md`](docs/canonical-model-reference.md) — canonical field and validation reference;
 - [`docs/scim-language.md`](docs/scim-language.md) — normative SCIM 0.2 language reference;
+- [`docs/library-api.md`](docs/library-api.md) — exported TypeScript API;
 - [`docs/scim-radial-1.md`](docs/scim-radial-1.md) — deterministic radial renderer contract;
 - [`docs/canonical-workspace.md`](docs/canonical-workspace.md) — primary map behaviour;
 - [`docs/proposal-review.md`](docs/proposal-review.md) — human and AI review workflow;
@@ -168,6 +176,7 @@ Key documents:
 - [`docs/mobile-and-accessibility.md`](docs/mobile-and-accessibility.md) — interaction contract;
 - [`docs/development-and-release.md`](docs/development-and-release.md) — CI, Vercel and release process;
 - [`docs/testing-strategy.md`](docs/testing-strategy.md) — current and intended test coverage;
+- [`docs/governance.md`](docs/governance.md) — roles and decision rights;
 - [`docs/roadmap.md`](docs/roadmap.md) — known limitations and sequenced next work;
 - [`SECURITY.md`](SECURITY.md) — sensitive infrastructure data and vulnerability handling.
 
@@ -175,6 +184,9 @@ Key documents:
 
 SCIM is pre-1.0. Important gaps are documented rather than hidden:
 
+- canonical evidence, scenario timestamps and INAM notes are not yet lossless through SCIM DSL;
+- nested extension values and some quoted-string cases are not yet robustly portable;
+- automatic radial layout and strict missing-placement enforcement are not implemented;
 - browser-local rather than shared cloud projects;
 - no authentication or real-time collaboration;
 - status-based rather than time-, capacity- or probability-based simulation;
@@ -183,7 +195,7 @@ SCIM is pre-1.0. Important gaps are documented rather than hidden:
 - incomplete automated test and accessibility coverage;
 - local storage is not encrypted or a durable backup.
 
-See [`docs/roadmap.md`](docs/roadmap.md).
+See [`docs/implementation-status.md`](docs/implementation-status.md) and [`docs/roadmap.md`](docs/roadmap.md).
 
 ## Data and AI safety
 
@@ -214,7 +226,8 @@ Contributors should preserve these boundaries:
 - AI output remains a proposal until human acceptance;
 - human and AI accepted changes use the same canonical diff and history;
 - primary interactions work with mouse, touch and pen;
-- documentation changes with behaviour.
+- documentation changes with behaviour;
+- schema, DSL and UI conformance gaps are stated honestly.
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
