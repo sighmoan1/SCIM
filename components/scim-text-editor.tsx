@@ -13,6 +13,7 @@ import {
 } from "@/lib/scim/serializer";
 import { serializeScimAiHandoff } from "@/lib/scim/handoff";
 import { serializeScimRadialSvg } from "@/lib/scim/radial-svg";
+import { evaluateDependencyRequirements } from "@/lib/scim/requirements";
 import type { ScimDocument, ScimRadialView } from "@/lib/scim/schema";
 import { applyScenario, propagateCriticalFailures } from "@/lib/scim/simulation";
 import { ScimRadialPreview } from "@/components/scim-radial-preview";
@@ -49,18 +50,17 @@ const EXAMPLE = `model hospital-resilience "Hospital resilience" {
     fuel-hours: 36
   }
 
-  entity fuel-depot "Fuel depot" {
-    kind: fuel
-    layer: region
-    failure-modes: [system-externalities, economics]
-  }
-
   grid -> hospital {
     id: grid-hospital
     kind: supplies
     mode: grid
     critical: true
     service-effects: [provision, quality]
+    requirement-group: hospital-power
+    requirement-service: electricity
+    requirement-policy: any
+    minimum-available: 1
+    when-unsatisfied: failed
   }
 
   generator -> hospital {
@@ -69,14 +69,11 @@ const EXAMPLE = `model hospital-resilience "Hospital resilience" {
     mode: on-site
     critical: true
     service-effects: [provision]
-  }
-
-  fuel-depot -> generator {
-    id: fuel-generator
-    kind: supplies
-    mode: delivery
-    critical: true
-    service-effects: [provision, cost]
+    requirement-group: hospital-power
+    requirement-service: electricity
+    requirement-policy: any
+    minimum-available: 1
+    when-unsatisfied: failed
   }
 
   hospital -> patient {
@@ -84,13 +81,23 @@ const EXAMPLE = `model hospital-resilience "Hospital resilience" {
     kind: protects
     critical: true
     service-effects: [provision, quality]
+    requirement-group: patient-care
+    requirement-service: emergency-care
+    requirement-policy: all
+    when-unsatisfied: failed
   }
 
-  scenario grid-failure "Regional grid failure" {
+  scenario grid-failure "Grid failure with working backup" {
     set grid status failed
     set relationship grid-hospital status failed
-    set hospital status degraded
     set generator status normal
+  }
+
+  scenario total-power-loss "Grid and generator unavailable" {
+    set grid status failed
+    set relationship grid-hospital status failed
+    set generator status failed
+    set relationship generator-hospital status failed
   }
 
   view main radial "Hospital resilience radial SCIM" {
@@ -119,11 +126,9 @@ const EXAMPLE = `model hospital-resilience "Hospital resilience" {
     place hospital at 370 420 size 120 40
     place generator at 615 430 size 120 40
     place grid at 720 290 size 120 40
-    place fuel-depot at 780 520 size 110 40
 
     route grid-hospital via 720 290, 560 340, 370 420
     route generator-hospital via 615 430, 500 425, 370 420
-    route fuel-generator via 780 520, 700 475, 615 430
     route hospital-patient via 370 420, 440 460, 500 500
   }
 }`;
@@ -156,8 +161,8 @@ async function copyText(value: string): Promise<void> {
 
 export function ScimTextEditor() {
   const [source, setSource] = useState(EXAMPLE);
-  const [selectedScenario, setSelectedScenario] = useState<string>("");
-  const [selectedView, setSelectedView] = useState<string>("");
+  const [selectedScenario, setSelectedScenario] = useState("");
+  const [selectedView, setSelectedView] = useState("");
   const [copyMessage, setCopyMessage] = useState("");
 
   const result = useMemo(() => {
@@ -175,24 +180,44 @@ export function ScimTextEditor() {
     }
   }, [source]);
 
-  const activeDocument = useMemo<ScimDocument | null>(() => {
+  const simulation = useMemo(() => {
     if (!result.document) return null;
-    if (!selectedScenario) return result.document;
+    if (!selectedScenario) {
+      return {
+        document: result.document,
+        warnings: [] as string[],
+        explanations: [] as string[],
+      };
+    }
+
     const applied = applyScenario(result.document, selectedScenario);
-    return propagateCriticalFailures(applied.document).document;
+    const propagated = propagateCriticalFailures(applied.document);
+    return {
+      document: propagated.document,
+      warnings: [...applied.warnings, ...propagated.warnings],
+      explanations: [...applied.explanations, ...propagated.explanations],
+    };
   }, [result.document, selectedScenario]);
 
+  const activeDocument = simulation?.document ?? result.document;
+  const requirementResult = useMemo(
+    () =>
+      activeDocument
+        ? evaluateDependencyRequirements(activeDocument)
+        : { evaluations: [], warnings: [] },
+    [activeDocument]
+  );
   const radialViews = useMemo(
     () =>
-      (activeDocument?.views.filter(
+      activeDocument?.views.filter(
         (view): view is ScimRadialView => view.type === "radial"
-      ) ?? []),
+      ) ?? [],
     [activeDocument]
   );
   const activeViewId = radialViews.some((view) => view.id === selectedView)
     ? selectedView
     : radialViews[0]?.id;
-  const exportDocument = activeDocument ?? result.document;
+  const exportDocument: ScimDocument | null = activeDocument ?? null;
 
   const copyForAi = async () => {
     if (!exportDocument) return;
@@ -237,9 +262,9 @@ export function ScimTextEditor() {
               </ul>
             ) : (
               <p className="text-sm text-green-700">
-                Valid SCIM {result.document?.schemaVersion} model with{" "}
-                {result.document?.entities.length} entities, {result.document?.relationships.length}{" "}
-                relationships and {result.document?.views.length} views.
+                Valid SCIM {result.document?.schemaVersion} model with {result.document?.entities.length}{" "}
+                entities, {result.document?.relationships.length} relationships and{" "}
+                {result.document?.views.length} views.
               </p>
             )}
           </CardContent>
@@ -250,8 +275,9 @@ export function ScimTextEditor() {
             <CardHeader>
               <CardTitle>Scenario</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
               <select
+                aria-label="Scenario"
                 className="w-full rounded-md border bg-background p-2 text-base"
                 value={selectedScenario}
                 onChange={(event) => setSelectedScenario(event.target.value)}
@@ -263,9 +289,52 @@ export function ScimTextEditor() {
                   </option>
                 ))}
               </select>
+              {simulation?.explanations.length ? (
+                <ol className="space-y-1 text-sm">
+                  {simulation.explanations.map((explanation, index) => (
+                    <li key={`${index}-${explanation}`}>{explanation}</li>
+                  ))}
+                </ol>
+              ) : null}
+              {[...(simulation?.warnings ?? []), ...requirementResult.warnings].map(
+                (warning) => (
+                  <p key={warning} className="text-sm text-amber-700">
+                    {warning}
+                  </p>
+                )
+              )}
             </CardContent>
           </Card>
         )}
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Dependency requirements</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {requirementResult.evaluations.length ? (
+              requirementResult.evaluations.map((requirement) => (
+                <div key={requirement.id} className="rounded-md border p-3 text-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <strong>{requirement.service ?? requirement.id}</strong>
+                    <span className={requirement.satisfied ? "text-green-700" : "text-red-700"}>
+                      {requirement.satisfied ? "Satisfied" : "Unsatisfied"}
+                    </span>
+                  </div>
+                  <p className="text-muted-foreground">
+                    {requirement.targetEntityId} needs {requirement.minimumAvailable} of{" "}
+                    {requirement.relationshipIds.length} providers ({requirement.policy}).
+                  </p>
+                  <p className="mt-1">{requirement.explanation}</p>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No explicit requirement groups. Incoming dependency logic remains unspecified.
+              </p>
+            )}
+          </CardContent>
+        </Card>
 
         {activeDocument && radialViews.length > 0 && activeViewId && (
           <Card>
@@ -294,7 +363,7 @@ export function ScimTextEditor() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Dependency view</CardTitle>
+            <CardTitle>Directed relationships</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             {activeDocument?.relationships.map((relationship) => {
@@ -304,6 +373,7 @@ export function ScimTextEditor() {
               const to = activeDocument.entities.find(
                 (entity) => entity.id === relationship.to
               );
+              const requirementGroup = relationship.attributes["requirement-group"];
               return (
                 <div key={relationship.id} className="rounded-md border p-3 text-sm">
                   <strong>{from?.name ?? relationship.from}</strong> →{" "}
@@ -312,6 +382,9 @@ export function ScimTextEditor() {
                     {relationship.kind}
                     {relationship.deliveryMode ? ` · ${relationship.deliveryMode}` : ""}
                     {relationship.status !== "normal" ? ` · ${relationship.status}` : ""}
+                    {typeof requirementGroup === "string"
+                      ? ` · requirement ${requirementGroup}`
+                      : ""}
                   </div>
                 </div>
               );
