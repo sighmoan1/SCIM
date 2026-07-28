@@ -1,4 +1,5 @@
 import { ScimDocumentSchema, type ScimDocument } from "./schema";
+import { evaluateDependencyRequirements } from "./requirements";
 
 function list(values: string[]): string {
   return values.length ? values.join(", ") : "none";
@@ -19,6 +20,7 @@ function entityLabel(document: ScimDocument, entityId: string): string {
  */
 export function serializeScimStructure(input: ScimDocument): string {
   const document = ScimDocumentSchema.parse(input);
+  const requirementResult = evaluateDependencyRequirements(document);
   const lines: string[] = [
     `SCIM ${document.schemaVersion} STRUCTURAL READING`,
     `Model: ${document.id} (${document.title})`,
@@ -56,6 +58,18 @@ export function serializeScimStructure(input: ScimDocument): string {
     if (relationship.evidence.length) {
       lines.push(`  evidence: ${JSON.stringify(relationship.evidence)}`);
     }
+  }
+
+  lines.push("", "DEPENDENCY REQUIREMENTS");
+  if (!requirementResult.evaluations.length) lines.push("- none declared");
+  for (const requirement of requirementResult.evaluations) {
+    lines.push(
+      `- ${requirement.id}: target=${entityLabel(document, requirement.targetEntityId)}; service=${requirement.service ?? "unspecified"}; policy=${requirement.policy}; minimum-available=${requirement.minimumAvailable}; providers=[${requirement.relationshipIds.join(", ")}]; when-unsatisfied=${requirement.whenUnsatisfied}; currently-satisfied=${requirement.satisfied}`
+    );
+    lines.push(`  ${requirement.explanation}`);
+  }
+  for (const warning of requirementResult.warnings) {
+    lines.push(`- warning: ${warning}`);
   }
 
   lines.push("", "SCENARIOS (CHANGES TO THE BASELINE)");
@@ -130,7 +144,8 @@ export function serializeScimStructure(input: ScimDocument): string {
     "- Semantic meaning comes from model, entity and relationship fields, not from x/y position, proximity, colour or line routing.",
     "- A radial ring repeats an entity's declared locality layer; it does not create that layer membership.",
     "- A sector is a presentation of a declared need; it does not by itself assert that a nearby entity supports that need.",
-    "- Multiple incoming relationships do not automatically mean all are required or that any one is sufficient. Treat dependency logic as unspecified unless the model states it explicitly in typed fields or attributes.",
+    "- Requirement groups explicitly state whether all, any, or at least N providers are needed. Do not replace them with visual inference.",
+    "- Multiple incoming relationships without a requirement group remain logically unspecified.",
     "- Frozen view geometry is required only to reproduce the same diagram; it is not required to understand the infrastructure structure."
   );
 
