@@ -12,21 +12,15 @@ import {
   type TierId,
 } from "./tiers";
 
-/**
- * The INAM (Integrated Needs Analysis Matrix, the "SCIM Matrix") from Dealing
- * in Security: needs as rows, the layers of provision as columns, showing where
- * every critical resource comes from and how needs interdepend. It is the
- * second canonical view over the same ScimDocument — a horizontal reading of
- * each need across levels, complementing the radial map's centre-out reading.
- *
- * Derived deterministically; never mutates accepted state.
- */
+export type InamEntityRole = "direct" | "upstream";
 
 export interface InamCellEntity {
   id: string;
   name: string;
   reportedStatus: EntityStatus;
   effectiveStatus: EntityStatus;
+  role: InamEntityRole;
+  distance: number;
 }
 
 export interface InamCell {
@@ -50,34 +44,60 @@ export interface InamTierGroup {
 export interface InamMatrix {
   layers: Layer[];
   groups: InamTierGroup[];
-  /** Layers that actually hold at least one placed entity. */
   usedLayerIds: string[];
 }
 
 function protectsNeed(entity: ScimEntity, needId: string): boolean {
-  return (
-    entity.supportsNeeds.includes(needId) ||
-    entity.protectsAgainst.includes(needId)
-  );
+  return entity.supportsNeeds.includes(needId) || entity.protectsAgainst.includes(needId);
 }
 
-/**
- * Build the matrix. Only layers that hold at least one entity are kept as
- * columns (plus always the layers present in the document), so a small map does
- * not render seven empty columns.
- */
+function providersForNeed(
+  document: ScimDocument,
+  needId: string
+): Map<string, { entity: ScimEntity; distance: number }> {
+  const incoming = new Map<string, string[]>();
+  for (const relationship of document.relationships) {
+    const current = incoming.get(relationship.to) ?? [];
+    current.push(relationship.from);
+    incoming.set(relationship.to, current);
+  }
+
+  const entities = new Map(document.entities.map((entity) => [entity.id, entity]));
+  const result = new Map<string, { entity: ScimEntity; distance: number }>();
+  const queue = document.entities
+    .filter((entity) => entity.kind !== "person" && protectsNeed(entity, needId))
+    .map((entity) => ({ entity, distance: 0 }));
+
+  while (queue.length) {
+    const current = queue.shift();
+    if (!current) break;
+    const existing = result.get(current.entity.id);
+    if (existing && existing.distance <= current.distance) continue;
+    result.set(current.entity.id, current);
+    for (const sourceId of incoming.get(current.entity.id) ?? []) {
+      const source = entities.get(sourceId);
+      if (source && source.kind !== "person") {
+        queue.push({ entity: source, distance: current.distance + 1 });
+      }
+    }
+  }
+
+  return result;
+}
+
 export function buildInamMatrix(document: ScimDocument): InamMatrix {
   const assessment = assessAllTiers(document);
   const statusByNeed = new Map<string, NeedStatus>();
   for (const tier of assessment.tiers) {
     for (const need of tier.needs) statusByNeed.set(need.need.id, need.status);
   }
-  const effective = assessment.effectiveStatuses;
 
+  const providersByNeed = new Map(
+    CANONICAL_NEEDS.map((need) => [need.id, providersForNeed(document, need.id)])
+  );
   const usedLayerIds = new Set<string>();
-  for (const entity of document.entities) {
-    if (entity.kind === "person") continue;
-    if (CANONICAL_NEEDS.some((need) => protectsNeed(entity, need.id))) {
+  for (const providers of providersByNeed.values()) {
+    for (const { entity } of providers.values()) {
       usedLayerIds.add(normaliseLayer(entity.layer));
     }
   }
@@ -92,19 +112,22 @@ export function buildInamMatrix(document: ScimDocument): InamMatrix {
     label: tier.label,
     rows: tier.needs.map((needId): InamRow => {
       const need = canonicalNeed(needId)!;
+      const providers = providersByNeed.get(needId) ?? new Map();
       const cells = columnLayers.map((layer): InamCell => {
-        const entities: InamCellEntity[] = document.entities
-          .filter(
-            (entity) =>
-              protectsNeed(entity, needId) &&
-              normaliseLayer(entity.layer) === layer.id
-          )
-          .map((entity) => ({
+        const entities = [...providers.values()]
+          .filter(({ entity }) => normaliseLayer(entity.layer) === layer.id)
+          .map(({ entity, distance }): InamCellEntity => ({
             id: entity.id,
             name: entity.name,
             reportedStatus: entity.status,
-            effectiveStatus: effective.get(entity.id) ?? entity.status,
-          }));
+            effectiveStatus:
+              assessment.effectiveStatuses.get(entity.id) ?? entity.status,
+            role: distance === 0 ? "direct" : "upstream",
+            distance,
+          }))
+          .sort(
+            (a, b) => a.distance - b.distance || a.name.localeCompare(b.name)
+          );
         return { needId, layerId: layer.id, entities };
       });
       return { need, status: statusByNeed.get(needId) ?? "unmapped", cells };
