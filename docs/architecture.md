@@ -1,6 +1,6 @@
 # SCIM architecture
 
-Status: current application architecture for SCIM Mapper v0.5.0 and SCIM schema 0.2.
+Status: current application architecture for SCIM Mapper v0.7.1 and SCIM schema 0.2.
 
 ## Product decision
 
@@ -15,6 +15,8 @@ The product supports three equal authoring modes:
 3. a human or AI returning a complete candidate model for review.
 
 All accepted work converges on one validated `ScimDocument`.
+
+The current product surfaces are Home (plain-language individual needs), Emergency (reported operating state and propagated impact), Map (canonical radial authoring), Matrix (a deterministic direct-and-upstream dependency projection), Build (guided higher-tier authoring), Model (portable text authoring) and Review (selective proposal acceptance). A service worker caches the application shell for offline startup; browser-local storage remains neither encrypted nor a durable backup.
 
 ## Architectural principles
 

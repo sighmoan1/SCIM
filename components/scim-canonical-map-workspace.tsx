@@ -18,6 +18,7 @@ import { serializeScimAiHandoff } from "@/lib/scim/handoff";
 import { DELIVERY_PATHS } from "@/lib/scim/tiers";
 import { serializeScimRadialSvg } from "@/lib/scim/radial-svg";
 import { ScimDocumentSchema, type ScimDocument, type ScimRadialView } from "@/lib/scim/schema";
+import { removeEntityFromDocument, removeRelationshipFromDocument } from "@/lib/scim/mutations";
 import { applyScenario, propagateCriticalFailures } from "@/lib/scim/simulation";
 import {
   createScimWorkspaceRevision,
@@ -419,33 +420,9 @@ export function ScimCanonicalMapWorkspace() {
   };
 
   const deleteSelectedEntity = () => {
-    if (!selectedEntity || !radialView) return;
-    const relationshipIds = new Set(
-      document.relationships
-        .filter(
-          (relationship) =>
-            relationship.from === selectedEntity.id || relationship.to === selectedEntity.id
-        )
-        .map((relationship) => relationship.id)
-    );
-    const next = replaceRadialView(
-      {
-        ...document,
-        focusEntityId:
-          document.focusEntityId === selectedEntity.id ? undefined : document.focusEntityId,
-        entities: document.entities.filter((entity) => entity.id !== selectedEntity.id),
-        relationships: document.relationships.filter(
-          (relationship) => !relationshipIds.has(relationship.id)
-        ),
-      },
-      radialView.id,
-      (view) => ({
-        ...view,
-        nodes: view.nodes.filter((node) => node.entityId !== selectedEntity.id),
-        routes: view.routes.filter((route) => !relationshipIds.has(route.relationshipId)),
-      })
-    );
-    commit(next, `Delete ${selectedEntity.name}`);
+    if (!selectedEntity) return;
+    const next = removeEntityFromDocument(document, selectedEntity.id);
+    commit(next, `Delete ${selectedEntity.name} and its references`);
     setSelectedEntityId(next.entities[0]?.id ?? "");
   };
 
@@ -479,16 +456,10 @@ export function ScimCanonicalMapWorkspace() {
   const deleteRelationship = (id: string) => {
     const relationship = document.relationships.find((candidate) => candidate.id === id);
     if (!relationship) return;
-    const next: ScimDocument = {
-      ...document,
-      relationships: document.relationships.filter((candidate) => candidate.id !== id),
-      views: document.views.map((view) =>
-        view.type === "radial"
-          ? { ...view, routes: view.routes.filter((route) => route.relationshipId !== id) }
-          : view
-      ),
-    };
-    commit(next, `Delete relationship ${id}`);
+    commit(
+      removeRelationshipFromDocument(document, id),
+      `Delete relationship ${id} and its references`
+    );
   };
 
   const undoLastRevision = () => {

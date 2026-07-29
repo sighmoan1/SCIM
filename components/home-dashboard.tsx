@@ -433,7 +433,7 @@ export function HomeDashboard() {
             return (
               <Link
                 key={tier.tier}
-                href="/matrix"
+                href={`/build?tier=${tier.tier}`}
                 className="pressable flex items-start gap-3 rounded-2xl bg-card p-4 shadow-soft ring-1 ring-inset ring-border/60"
               >
                 <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-secondary text-primary">

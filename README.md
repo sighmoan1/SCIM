@@ -18,7 +18,7 @@ SCIM is **not** a generic flowchart editor. The diagram is one view over a struc
 
 ## Current versions
 
-- Application: **0.7.0**
+- Application: **0.7.1**
 - Portable SCIM schema/language: **0.2**
 - Radial renderer profile: **`scim-radial-1`**
 
@@ -41,13 +41,14 @@ SCIM is pre-1.0. The canonical schema is currently broader than the lossless DSL
 | `/` | Home dashboard: live protected/at-risk status for the six needs, plain-language explanations and a guided per-need builder |
 | `/emergency` | Mobile-first emergency workspace: report infrastructure down, see propagated impact on needs and surviving backups |
 | `/map` | Interactive canonical radial map with zoom/fit, native pointer editing, delivery paths, scenarios and revisions |
-| `/matrix` | The canonical INAM needs matrix — the eighteen needs across the four tiers, read against the layers of provision |
+| `/matrix` | Derived INAM dependency projection — eighteen needs across four tiers with direct and upstream providers by layer |
+| `/build` | Guided authoring for group, organisation and nation-state needs |
 | `/more` | Plain-language SCIM explanation, AI collaboration, export/backup, examples and advanced-tool links |
 | `/editor` | Advanced SCIM text authoring, validation, deterministic preview and exports |
 | `/review` | Compare and selectively accept a complete human or AI candidate model |
 | `/legacy` | Preserved original mapper while specialist controls are migrated |
 
-Navigation is a bottom tab bar on phones (Home, Map, Emergency, More) and a top bar on larger screens. The application ships light and dark themes (following the system by default), an installable web app manifest, and an animated six-segment resilience ring summarising need status on Home.
+Navigation is a five-item bottom tab bar on phones and a top bar on larger screens. The application ships light and dark themes, an installable web app manifest, an animated six-segment resilience ring, and a service worker that caches the application shell and visited same-origin resources for offline startup.
 
 The production application should deploy from `main`. The interface displays application, schema and build information so a deployed build can be checked against the repository commit.
 

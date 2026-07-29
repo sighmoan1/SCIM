@@ -1,6 +1,6 @@
 # Implementation status and known contract gaps
 
-Status: current as of application 0.5.0 and SCIM schema 0.2.
+Status: current as of application 0.7.1 and SCIM schema 0.2.
 
 This document distinguishes:
 
@@ -32,11 +32,14 @@ It exists so future collaborators do not assume that a schema field is already l
 | automatic radial layout | accepted by schema | yes | yes | no layout engine | renderer uses declared placements only |
 | deterministic frozen radial SVG | yes | n/a | n/a | yes | yes |
 | complete-placement enforcement | schema validates references | n/a | n/a | not enforced | renderer currently omits unplaced entities |
-| INAM rows, columns and cells | yes | yes | yes | not exposed | source only |
+| explicit INAM rows, columns and cells | yes | yes | yes | source-only authored view; Matrix uses a deterministic projection | source only |
+| derived INAM dependency projection | derived | n/a | n/a | direct and upstream providers by need and layer | n/a |
 | INAM cell note | yes | **not parsed** | **not emitted** | not exposed | JSON only |
 | evidence/confidence in AI structural reading | yes when present canonically | n/a | authoritative DSL currently loses it | no UI authoring | included only if document already contains it |
 | explicit dependency requirements | relationship attributes | yes | yes | evaluation display; limited editing | yes |
-| human/AI revisions | workspace model | n/a | n/a | yes | Review integration; Model not transactionally synced |
+| human/AI revisions | workspace model | n/a | n/a | yes; shared hook still being adopted by Map | Review integration; Model not transactionally synced |
+| offline application shell | n/a | n/a | n/a | service worker caches shell and visited resources | n/a |
+| automated semantic tests | n/a | n/a | n/a | need status, safe deletion, INAM projection and starter round-trip | n/a |
 
 ## Evidence portability gap
 
