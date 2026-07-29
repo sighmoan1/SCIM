@@ -5,17 +5,11 @@ on:
   push:
     branches: [main]
 
-permissions:
-  contents: write
-
 jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: hardening/v0.7.1
-          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           version: 10
@@ -23,16 +17,7 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - name: Refactor Map workspace
-        run: node scripts/refactor-map-workspace.mjs
       - run: pnpm install --no-frozen-lockfile
       - run: pnpm test
       - run: pnpm typecheck
       - run: pnpm build
-      - name: Commit verified Map refactor
-        run: |
-          git config user.name "SCIM release automation"
-          git config user.email "actions@users.noreply.github.com"
-          git add components/scim-canonical-map-workspace.tsx
-          git commit -m "Use shared transactional workspace in Map"
-          git push origin HEAD:hardening/v0.7.1
