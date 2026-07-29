@@ -1,5 +1,14 @@
 import { propagateCriticalFailures, type SimulationResult } from "./simulation";
 import type { EntityStatus, ScimDocument, ScimEntity } from "./schema";
+import {
+  CANONICAL_NEEDS,
+  canonicalNeed,
+  layerRank,
+  needsForTier,
+  TIERS,
+  type CanonicalNeed,
+  type TierId,
+} from "./tiers";
 
 /**
  * Plain-language presentation of the six ways to die from the original SCIM
@@ -8,7 +17,9 @@ import type { EntityStatus, ScimDocument, ScimEntity } from "./schema";
  * illness and injury.
  *
  * This module derives read-only presentation state from the canonical
- * document. It never mutates accepted state.
+ * document. It never mutates accepted state. The six-ways-to-die exports below
+ * cover the individual tier; the tier-aware assessment (assessNeeds) covers the
+ * full eighteen canonical needs across all four tiers.
  */
 
 export type NeedFamilyId = "shelter" | "supply" | "safety";
@@ -134,7 +145,15 @@ function protectsNeed(entity: ScimEntity, needId: string): boolean {
 
 const STATUS_AVAILABLE: ReadonlySet<EntityStatus> = new Set(["normal", "new"]);
 
-export function assessDocument(document: ScimDocument): DocumentAssessment {
+interface AssessmentContext {
+  effectiveStatuses: Map<string, EntityStatus>;
+  baselineEntities: Map<string, ScimEntity>;
+}
+
+function buildContext(document: ScimDocument): {
+  propagation: SimulationResult;
+  context: AssessmentContext;
+} {
   const propagation = propagateCriticalFailures(document);
   const effectiveStatuses = new Map<string, EntityStatus>(
     propagation.document.entities.map((entity) => [entity.id, entity.status])
@@ -142,75 +161,176 @@ export function assessDocument(document: ScimDocument): DocumentAssessment {
   const baselineEntities = new Map(
     document.entities.map((entity) => [entity.id, entity])
   );
-
-  const needs: NeedAssessment[] = SIX_THREATS.map((threat) => {
-    const protectors: ProtectorAssessment[] = document.entities
-      .filter((entity) => protectsNeed(entity, threat.id))
-      .map((entity) => {
-        const effectiveStatus = effectiveStatuses.get(entity.id) ?? entity.status;
-        const supplyNotes: string[] = [];
-        for (const relationship of document.relationships) {
-          if (relationship.to !== entity.id || !relationship.critical) continue;
-          const source = baselineEntities.get(relationship.from);
-          if (!source) continue;
-          const sourceStatus = effectiveStatuses.get(source.id) ?? source.status;
-          if (sourceStatus === "failed" || relationship.status === "failed") {
-            supplyNotes.push(`${source.name} is down`);
-          } else if (sourceStatus === "degraded" || relationship.status === "degraded") {
-            supplyNotes.push(`${source.name} is struggling`);
-          }
-        }
-        return {
-          entity,
-          reportedStatus: entity.status,
-          effectiveStatus,
-          working: STATUS_AVAILABLE.has(effectiveStatus),
-          supplyNotes,
-        };
-      });
-
-    const workingProtectors = protectors.filter((protector) => protector.working);
-
-    let status: NeedStatus;
-    if (!protectors.length) {
-      status = "unmapped";
-    } else if (!workingProtectors.length) {
-      status = "unprotected";
-    } else if (
-      protectors.some((protector) => !protector.working) ||
-      workingProtectors.some((protector) => protector.supplyNotes.length)
-    ) {
-      status = "at-risk";
-    } else {
-      status = "protected";
-    }
-
-    return { threat, status, protectors, workingProtectors };
-  });
-
-  const counts = {
-    protected: needs.filter((need) => need.status === "protected").length,
-    atRisk: needs.filter((need) => need.status === "at-risk").length,
-    unprotected: needs.filter((need) => need.status === "unprotected").length,
-    unmapped: needs.filter((need) => need.status === "unmapped").length,
-  };
-
-  return { needs, propagation, effectiveStatuses, counts };
+  return { propagation, context: { effectiveStatuses, baselineEntities } };
 }
 
-const LAYER_ORDER = [
-  "individual",
-  "household",
-  "neighbourhood",
-  "municipality",
-  "region",
-  "country",
-  "world",
-];
+/** Assess the protectors of one need id and derive its status. */
+function assessProtectors(
+  document: ScimDocument,
+  needId: string,
+  { effectiveStatuses, baselineEntities }: AssessmentContext
+): { status: NeedStatus; protectors: ProtectorAssessment[]; working: ProtectorAssessment[] } {
+  const protectors: ProtectorAssessment[] = document.entities
+    .filter((entity) => protectsNeed(entity, needId))
+    .map((entity) => {
+      const effectiveStatus = effectiveStatuses.get(entity.id) ?? entity.status;
+      const supplyNotes: string[] = [];
+      for (const relationship of document.relationships) {
+        if (relationship.to !== entity.id || !relationship.critical) continue;
+        const source = baselineEntities.get(relationship.from);
+        if (!source) continue;
+        const sourceStatus = effectiveStatuses.get(source.id) ?? source.status;
+        if (sourceStatus === "failed" || relationship.status === "failed") {
+          supplyNotes.push(`${source.name} is down`);
+        } else if (sourceStatus === "degraded" || relationship.status === "degraded") {
+          supplyNotes.push(`${source.name} is struggling`);
+        }
+      }
+      return {
+        entity,
+        reportedStatus: entity.status,
+        effectiveStatus,
+        working: STATUS_AVAILABLE.has(effectiveStatus),
+        supplyNotes,
+      };
+    });
 
-function layerRank(layer: string): number {
-  const index = LAYER_ORDER.indexOf(layer);
-  return index === -1 ? LAYER_ORDER.length : index;
+  const working = protectors.filter((protector) => protector.working);
+
+  let status: NeedStatus;
+  if (!protectors.length) {
+    status = "unmapped";
+  } else if (!working.length) {
+    status = "unprotected";
+  } else if (
+    protectors.some((protector) => !protector.working) ||
+    working.some((protector) => protector.supplyNotes.length)
+  ) {
+    status = "at-risk";
+  } else {
+    status = "protected";
+  }
+
+  return { status, protectors, working };
+}
+
+function tallyCounts(statuses: NeedStatus[]) {
+  return {
+    protected: statuses.filter((status) => status === "protected").length,
+    atRisk: statuses.filter((status) => status === "at-risk").length,
+    unprotected: statuses.filter((status) => status === "unprotected").length,
+    unmapped: statuses.filter((status) => status === "unmapped").length,
+  };
+}
+
+export function assessDocument(document: ScimDocument): DocumentAssessment {
+  const { propagation, context } = buildContext(document);
+
+  const needs: NeedAssessment[] = SIX_THREATS.map((threat) => {
+    const { status, protectors, working } = assessProtectors(
+      document,
+      threat.id,
+      context
+    );
+    return { threat, status, protectors, workingProtectors: working };
+  });
+
+  return {
+    needs,
+    propagation,
+    effectiveStatuses: context.effectiveStatuses,
+    counts: tallyCounts(needs.map((need) => need.status)),
+  };
+}
+
+// --- Tier-aware assessment across all eighteen canonical needs -------------
+
+export interface CanonicalNeedAssessment {
+  need: CanonicalNeed;
+  status: NeedStatus;
+  protectors: ProtectorAssessment[];
+  workingProtectors: ProtectorAssessment[];
+}
+
+export interface TierAssessment {
+  tier: TierId;
+  label: string;
+  summary: string;
+  needs: CanonicalNeedAssessment[];
+  counts: ReturnType<typeof tallyCounts>;
+  /** True when the map has at least one protector for any need in this tier. */
+  mapped: boolean;
+}
+
+export interface FullAssessment {
+  tiers: TierAssessment[];
+  propagation: SimulationResult;
+  effectiveStatuses: Map<string, EntityStatus>;
+  counts: ReturnType<typeof tallyCounts>;
+}
+
+/** Assess every canonical need, grouped by the four tiers of cooperation. */
+export function assessAllTiers(document: ScimDocument): FullAssessment {
+  const { propagation, context } = buildContext(document);
+
+  const tiers: TierAssessment[] = TIERS.map((tier) => {
+    const needs: CanonicalNeedAssessment[] = needsForTier(tier.id).map((need) => {
+      const { status, protectors, working } = assessProtectors(
+        document,
+        need.id,
+        context
+      );
+      return { need, status, protectors, workingProtectors: working };
+    });
+    return {
+      tier: tier.id,
+      label: tier.label,
+      summary: tier.summary,
+      needs,
+      counts: tallyCounts(needs.map((need) => need.status)),
+      mapped: needs.some((need) => need.status !== "unmapped"),
+    };
+  });
+
+  const allStatuses = tiers.flatMap((tier) =>
+    tier.needs.map((need) => need.status)
+  );
+
+  return {
+    tiers,
+    propagation,
+    effectiveStatuses: context.effectiveStatuses,
+    counts: tallyCounts(allStatuses),
+  };
+}
+
+/** Assess a single canonical need by id (any tier). */
+export function assessCanonicalNeed(
+  document: ScimDocument,
+  needId: string
+): CanonicalNeedAssessment | null {
+  const need = canonicalNeed(needId);
+  if (!need) return null;
+  const { context } = buildContext(document);
+  const { status, protectors, working } = assessProtectors(
+    document,
+    needId,
+    context
+  );
+  return { need, status, protectors, workingProtectors: working };
+}
+
+/** Canonical needs that appear in this document, by tier presence. */
+export function mappedTierIds(document: ScimDocument): Set<TierId> {
+  const present = new Set<TierId>();
+  for (const need of CANONICAL_NEEDS) {
+    if (
+      document.entities.some((entity) => protectsNeed(entity, need.id))
+    ) {
+      present.add(need.tier);
+    }
+  }
+  return present;
 }
 
 /**
@@ -243,8 +363,8 @@ export function needsAffectedBy(
 
     const entity = document.entities.find((candidate) => candidate.id === currentId);
     if (entity) {
-      for (const threat of SIX_THREATS) {
-        if (protectsNeed(entity, threat.id)) affected.add(threat.id);
+      for (const need of CANONICAL_NEEDS) {
+        if (protectsNeed(entity, need.id)) affected.add(need.id);
       }
     }
 
@@ -253,5 +373,5 @@ export function needsAffectedBy(
     }
   }
 
-  return SIX_THREATS.map((threat) => threat.id).filter((id) => affected.has(id));
+  return CANONICAL_NEEDS.map((need) => need.id).filter((id) => affected.has(id));
 }

@@ -14,6 +14,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createPersonalStarterDocument } from "@/lib/scim/personal-starter";
+import { serializeScimAiHandoff } from "@/lib/scim/handoff";
+import { DELIVERY_PATHS } from "@/lib/scim/tiers";
 import { serializeScimRadialSvg } from "@/lib/scim/radial-svg";
 import { ScimDocumentSchema, type ScimDocument, type ScimRadialView } from "@/lib/scim/schema";
 import { applyScenario, propagateCriticalFailures } from "@/lib/scim/simulation";
@@ -95,6 +97,19 @@ function commaList(value: string): string[] {
     .filter(Boolean);
 }
 
+function copyText(value: string): Promise<void> {
+  if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(value);
+  const textarea = window.document.createElement("textarea");
+  textarea.value = value;
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  window.document.body.appendChild(textarea);
+  textarea.select();
+  window.document.execCommand("copy");
+  textarea.remove();
+  return Promise.resolve();
+}
+
 function replaceRadialView(
   document: ScimDocument,
   viewId: string,
@@ -144,6 +159,7 @@ export function ScimCanonicalMapWorkspace() {
   const [relationshipTo, setRelationshipTo] = useState("");
   const [relationshipKind, setRelationshipKind] = useState("depends-on");
   const [relationshipCritical, setRelationshipCritical] = useState(false);
+  const [relationshipMode, setRelationshipMode] = useState("");
 
   const viewportRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<SVGSVGElement>(null);
@@ -446,6 +462,9 @@ export function ScimCanonicalMapWorkspace() {
           from: relationshipFrom,
           to: relationshipTo,
           kind: slugify(relationshipKind),
+          deliveryMode: relationshipMode
+            ? (relationshipMode as ScimDocument["relationships"][number]["deliveryMode"])
+            : undefined,
           status: "normal",
           critical: relationshipCritical,
           serviceEffects: [],
@@ -550,8 +569,24 @@ export function ScimCanonicalMapWorkspace() {
           <p className="max-w-3xl text-sm text-muted-foreground">
             You are at the centre. Each ring is a layer of the world around you — household,
             neighbourhood, town and beyond — and the six dangers sit around the edge. Arrows show
-            what supplies what.
+            what supplies what. The same model is a shared language you can hand to another person
+            or an AI.
           </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            className="pressable rounded-xl"
+            onClick={async () => {
+              await copyText(serializeScimAiHandoff(documentRef.current));
+              setMessage("Map copied as a text handoff — paste it to a person or an AI to work on together.");
+            }}
+          >
+            Work on this with an AI
+          </Button>
+          <Button asChild variant="outline" className="pressable rounded-xl">
+            <Link href="/matrix">View as matrix</Link>
+          </Button>
         </div>
       </div>
 
@@ -773,6 +808,13 @@ export function ScimCanonicalMapWorkspace() {
               <div><Label>Provider / enabler</Label><select className="min-h-10 w-full rounded-md border bg-background px-2" value={relationshipFrom} onChange={(event) => setRelationshipFrom(event.target.value)}>{document.entities.map((entity) => <option key={entity.id} value={entity.id}>{entity.name}</option>)}</select></div>
               <div><Label>Receiver</Label><select className="min-h-10 w-full rounded-md border bg-background px-2" value={relationshipTo} onChange={(event) => setRelationshipTo(event.target.value)}>{document.entities.map((entity) => <option key={entity.id} value={entity.id}>{entity.name}</option>)}</select></div>
               <div><Label>Relationship kind</Label><Input list="scim-relationship-kinds" value={relationshipKind} onChange={(event) => setRelationshipKind(event.target.value)} /><datalist id="scim-relationship-kinds">{RELATIONSHIP_KINDS.map((kind) => <option key={kind} value={kind} />)}</datalist></div>
+              <div>
+                <Label>Delivery path</Label>
+                <select className="min-h-10 w-full rounded-md border bg-background px-2" value={relationshipMode} onChange={(event) => setRelationshipMode(event.target.value)}>
+                  <option value="">Unspecified</option>
+                  {DELIVERY_PATHS.map((path) => <option key={path.id} value={path.id}>{path.label}</option>)}
+                </select>
+              </div>
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={relationshipCritical} onChange={(event) => setRelationshipCritical(event.target.checked)} /> Critical dependency</label>
               <Button className="w-full" disabled={editingDisabled || relationshipFrom === relationshipTo} onClick={addRelationship}>Add relationship</Button>
             </CardContent>
@@ -785,7 +827,7 @@ export function ScimCanonicalMapWorkspace() {
                 <div key={relationship.id} className="flex items-start justify-between gap-2 rounded-md border p-2 text-sm">
                   <div>
                     <div className="font-medium">{document.entities.find((entity) => entity.id === relationship.from)?.name ?? relationship.from} → {document.entities.find((entity) => entity.id === relationship.to)?.name ?? relationship.to}</div>
-                    <div className="text-muted-foreground">{relationship.kind}{relationship.critical ? " · critical" : ""}</div>
+                    <div className="text-muted-foreground">{relationship.kind}{relationship.deliveryMode ? ` · ${DELIVERY_PATHS.find((path) => path.id === relationship.deliveryMode)?.label ?? relationship.deliveryMode}` : ""}{relationship.critical ? " · critical" : ""}</div>
                   </div>
                   <Button size="sm" variant="ghost" disabled={editingDisabled} onClick={() => deleteRelationship(relationship.id)}>Delete</Button>
                 </div>

@@ -18,7 +18,7 @@ SCIM is **not** a generic flowchart editor. The diagram is one view over a struc
 
 ## Current versions
 
-- Application: **0.6.0**
+- Application: **0.7.0**
 - Portable SCIM schema/language: **0.2**
 - Radial renderer profile: **`scim-radial-1`**
 
@@ -40,7 +40,8 @@ SCIM is pre-1.0. The canonical schema is currently broader than the lossless DSL
 | --- | --- |
 | `/` | Home dashboard: live protected/at-risk status for the six needs, plain-language explanations and a guided per-need builder |
 | `/emergency` | Mobile-first emergency workspace: report infrastructure down, see propagated impact on needs and surviving backups |
-| `/map` | Interactive canonical radial map with zoom/fit, native pointer editing, scenarios and revisions |
+| `/map` | Interactive canonical radial map with zoom/fit, native pointer editing, delivery paths, scenarios and revisions |
+| `/matrix` | The canonical INAM needs matrix — the eighteen needs across the four tiers, read against the layers of provision |
 | `/more` | Plain-language SCIM explanation, AI collaboration, export/backup, examples and advanced-tool links |
 | `/editor` | Advanced SCIM text authoring, validation, deterministic preview and exports |
 | `/review` | Compare and selectively accept a complete human or AI candidate model |

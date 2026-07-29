@@ -2,13 +2,20 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CircleAlert, House, Map as MapIcon, Menu } from "lucide-react";
+import {
+  CircleAlert,
+  Grid3x3,
+  House,
+  Map as MapIcon,
+  Menu,
+} from "lucide-react";
 import { ScimLogo } from "@/components/scim-logo";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   { href: "/", label: "Home", icon: House },
   { href: "/map", label: "Map", icon: MapIcon },
+  { href: "/matrix", label: "Matrix", icon: Grid3x3 },
   { href: "/emergency", label: "Emergency", icon: CircleAlert },
   { href: "/more", label: "More", icon: Menu },
 ];
@@ -59,7 +66,7 @@ export function AppNav() {
         aria-label="Main"
         className="fixed inset-x-0 bottom-0 z-40 border-t border-border/70 bg-background/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden"
       >
-        <div className="grid grid-cols-4">
+        <div className="grid grid-cols-5">
           {NAV_ITEMS.map((item) => {
             const active = isActive(pathname, item.href);
             const Icon = item.icon;

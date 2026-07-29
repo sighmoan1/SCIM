@@ -6,6 +6,8 @@ import {
   ArrowRight,
   ChevronDown,
   CircleAlert,
+  Grid3x3,
+  Layers,
   Map as MapIcon,
   Plus,
 } from "lucide-react";
@@ -21,6 +23,7 @@ import { Snackbar, useSnackbar } from "@/components/snackbar";
 import { useScimWorkspace } from "@/components/use-scim-workspace";
 import { addProtection, PROTECTION_SUGGESTIONS } from "@/lib/scim/guided";
 import {
+  assessAllTiers,
   assessDocument,
   NEED_FAMILIES,
   type NeedAssessment,
@@ -269,6 +272,7 @@ export function HomeDashboard() {
   const { snackbar, visible, show } = useSnackbar();
 
   const assessment = useMemo(() => assessDocument(document), [document]);
+  const tierAssessment = useMemo(() => assessAllTiers(document), [document]);
   const { counts } = assessment;
   const anyFailure = counts.atRisk + counts.unprotected > 0;
 
@@ -401,6 +405,61 @@ export function HomeDashboard() {
           </section>
         );
       })}
+
+      {/* The four tiers of cooperation */}
+      <section className="space-y-2.5">
+        <div className="flex items-baseline justify-between gap-2 px-1">
+          <div className="flex items-baseline gap-2">
+            <h2 className="text-[13px] font-bold uppercase tracking-widest text-muted-foreground">
+              The four tiers
+            </h2>
+            <span className="text-xs text-muted-foreground/70">
+              SCIM maps more than one person
+            </span>
+          </div>
+          <Link
+            href="/matrix"
+            className="inline-flex items-center gap-1 text-xs font-semibold text-primary"
+          >
+            <Grid3x3 className="h-3.5 w-3.5" aria-hidden="true" />
+            Matrix
+          </Link>
+        </div>
+        <div className="grid gap-2.5 sm:grid-cols-2">
+          {tierAssessment.tiers.map((tier) => {
+            const total = tier.needs.length;
+            const covered = total - tier.counts.unmapped;
+            const alert = tier.counts.atRisk + tier.counts.unprotected;
+            return (
+              <Link
+                key={tier.tier}
+                href="/matrix"
+                className="pressable flex items-start gap-3 rounded-2xl bg-card p-4 shadow-soft ring-1 ring-inset ring-border/60"
+              >
+                <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-secondary text-primary">
+                  <Layers className="h-[1.15rem] w-[1.15rem]" aria-hidden="true" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-2">
+                    <span className="font-semibold">{tier.label}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {covered}/{total} mapped
+                    </span>
+                  </span>
+                  <span className="mt-0.5 block text-[13px] text-muted-foreground">
+                    {tier.summary}
+                  </span>
+                  {alert > 0 && (
+                    <span className="mt-1 inline-block text-xs font-medium text-warn">
+                      {alert} need{alert === 1 ? "" : "s"} need attention
+                    </span>
+                  )}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
 
       {/* Primary actions */}
       <section className="grid gap-2.5 sm:grid-cols-2">

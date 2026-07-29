@@ -20,6 +20,7 @@ import { useScimWorkspace } from "@/components/use-scim-workspace";
 import { createDefaultScimDocument } from "@/lib/scim/default-model";
 import { serializeScimAiHandoff } from "@/lib/scim/handoff";
 import { createPersonalStarterDocument } from "@/lib/scim/personal-starter";
+import { createTownExampleDocument } from "@/lib/scim/town-example";
 import { serializeScimDsl } from "@/lib/scim/serializer";
 import { SCIM_SCHEMA_VERSION } from "@/lib/scim/version";
 import packageJson from "@/package.json";
@@ -260,6 +261,17 @@ export function MorePage() {
           >
             <FlaskConical className="mr-1.5 h-4 w-4" aria-hidden="true" />
             Personal starter map
+          </Button>
+          <Button
+            variant="outline"
+            className="pressable rounded-xl"
+            onClick={() => {
+              commit(createTownExampleDocument(), "Load town resilience example (all four tiers)");
+              show("Loaded the town example — see it in the Matrix");
+            }}
+          >
+            <FlaskConical className="mr-1.5 h-4 w-4" aria-hidden="true" />
+            Town (all four tiers)
           </Button>
           <Button
             variant="outline"
