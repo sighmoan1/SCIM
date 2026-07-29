@@ -46,7 +46,7 @@ SCIM is pre-1.0. The canonical schema is currently broader than the lossless DSL
 | `/review` | Compare and selectively accept a complete human or AI candidate model |
 | `/legacy` | Preserved original mapper while specialist controls are migrated |
 
-Navigation is a bottom tab bar on phones (Home, Map, Emergency, More) and a top bar on larger screens.
+Navigation is a bottom tab bar on phones (Home, Map, Emergency, More) and a top bar on larger screens. The application ships light and dark themes (following the system by default), an installable web app manifest, and an animated six-segment resilience ring summarising need status on Home.
 
 The production application should deploy from `main`. The interface displays application, schema and build information so a deployed build can be checked against the repository commit.
 

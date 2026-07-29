@@ -14,6 +14,9 @@ Needs-first interface rewrite: the application now leads with the six ways to di
 - Added bottom tab navigation on phones and a top bar on larger screens.
 - Added a personal household starter model (`my-resilience`) as the fresh-workspace default, including a ready-made power-cut scenario; the hospital example remains loadable from More.
 - Added `lib/scim/needs.ts` (derived need assessment) and `lib/scim/guided.ts` (suggestions and deterministic placement). Both are read-only or produce complete validated documents; the canonical model, schema 0.2, DSL and `scim-radial-1` renderer are unchanged.
+- Added a full design system: brand palette with automatic light/dark themes (and a manual switcher under More), Inter typography, soft elevation, motion with reduced-motion support, loading skeletons and snackbar confirmations.
+- Added the SCIM brand mark (radial-map motif), favicon, app icons and a web app manifest so the application can be installed to a phone's home screen.
+- Added an animated six-segment resilience ring on Home summarising all six needs at a glance.
 - Added comprehensive documentation for contributors, architecture, security, testing, mobile interaction, AI collaboration, workspace history and future work.
 - Updated the README and current workspace guides.
 

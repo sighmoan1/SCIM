@@ -25,31 +25,42 @@ export const NEED_ICONS: Record<string, LucideIcon> = {
 
 export const NEED_STATUS_META: Record<
   NeedStatus,
-  { label: string; icon: LucideIcon; pill: string; dot: string }
+  {
+    label: string;
+    icon: LucideIcon;
+    pill: string;
+    dot: string;
+    /** Hex stroke for the resilience ring, [light, dark]. */
+    ring: [string, string];
+  }
 > = {
   protected: {
     label: "Protected",
     icon: CircleCheck,
-    pill: "bg-emerald-100 text-emerald-800 border-emerald-200",
-    dot: "bg-emerald-500",
+    pill: "bg-ok-soft text-ok",
+    dot: "bg-ok",
+    ring: ["#188a5b", "#4cc38a"],
   },
   "at-risk": {
     label: "At risk",
     icon: CircleAlert,
-    pill: "bg-amber-100 text-amber-900 border-amber-200",
-    dot: "bg-amber-500",
+    pill: "bg-warn-soft text-warn",
+    dot: "bg-warn",
+    ring: ["#ba7b0b", "#f0b429"],
   },
   unprotected: {
     label: "Unprotected",
     icon: CircleX,
-    pill: "bg-red-100 text-red-800 border-red-200",
-    dot: "bg-red-500",
+    pill: "bg-danger-soft text-danger",
+    dot: "bg-danger",
+    ring: ["#d3271c", "#ef6a60"],
   },
   unmapped: {
-    label: "Not mapped yet",
+    label: "Not mapped",
     icon: CircleHelp,
-    pill: "bg-slate-100 text-slate-600 border-dashed border-slate-300",
-    dot: "bg-slate-400",
+    pill: "bg-muted text-muted-foreground",
+    dot: "bg-muted-foreground/40",
+    ring: ["#c5cfcc", "#3a4442"],
   },
 };
 
@@ -65,7 +76,7 @@ export function NeedStatusPill({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium",
+        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold",
         meta.pill,
         className
       )}
@@ -80,8 +91,8 @@ export const ENTITY_STATUS_META: Record<
   string,
   { label: string; dot: string; text: string }
 > = {
-  normal: { label: "working", dot: "bg-emerald-500", text: "text-emerald-700" },
-  new: { label: "working", dot: "bg-emerald-500", text: "text-emerald-700" },
-  degraded: { label: "struggling", dot: "bg-amber-500", text: "text-amber-700" },
-  failed: { label: "down", dot: "bg-red-500", text: "text-red-700" },
+  normal: { label: "working", dot: "bg-ok", text: "text-ok" },
+  new: { label: "working", dot: "bg-ok", text: "text-ok" },
+  degraded: { label: "struggling", dot: "bg-warn", text: "text-warn" },
+  failed: { label: "down", dot: "bg-danger", text: "text-danger" },
 };

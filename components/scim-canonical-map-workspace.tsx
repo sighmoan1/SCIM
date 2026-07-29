@@ -543,10 +543,10 @@ export function ScimCanonicalMapWorkspace() {
   const editingDisabled = Boolean(selectedScenarioId);
 
   return (
-    <div className="space-y-3 p-3 pb-12 md:p-4">
+    <div className="rise-in mx-auto max-w-7xl space-y-3 p-3 pb-12 md:p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold">Your map</h1>
+          <h1 className="text-[1.6rem] font-bold leading-tight">Your map</h1>
           <p className="max-w-3xl text-sm text-muted-foreground">
             You are at the centre. Each ring is a layer of the world around you — household,
             neighbourhood, town and beyond — and the six dangers sit around the edge. Arrows show
@@ -560,40 +560,44 @@ export function ScimCanonicalMapWorkspace() {
           <Card>
             <CardContent className="space-y-3 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    size="sm"
-                    variant={mode === "navigate" ? "default" : "outline"}
-                    aria-pressed={mode === "navigate"}
-                    onClick={() => {
-                      setMode("navigate");
-                      setMessage("Navigate mode. Pan or pinch around the complete map.");
-                    }}
-                  >
-                    Navigate
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={mode === "edit" ? "default" : "outline"}
-                    aria-pressed={mode === "edit"}
-                    disabled={editingDisabled}
-                    onClick={() => {
-                      setMode("edit");
-                      setMessage("Edit mode. Drag nodes with mouse, touch or pen; tap a node to inspect it.");
-                    }}
-                  >
-                    Edit map
-                  </Button>
-                  <Button size="sm" variant="outline" aria-label="Zoom out" onClick={() => zoomBy(1 / 1.25)}>−</Button>
-                  <Button size="sm" variant="outline" aria-label="Zoom in" onClick={() => zoomBy(1.25)}>+</Button>
-                  <Button size="sm" variant="outline" onClick={() => fitMap()}>Fit</Button>
-                  <Button size="sm" variant="outline" disabled={!revisions.length} onClick={undoLastRevision}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="grid grid-cols-2 gap-1 rounded-xl bg-muted/70 p-1" role="group" aria-label="Interaction mode">
+                    <button
+                      type="button"
+                      aria-pressed={mode === "navigate"}
+                      className={`pressable min-h-9 rounded-lg px-3 text-sm font-semibold transition-colors ${mode === "navigate" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                      onClick={() => {
+                        setMode("navigate");
+                        setMessage("Navigate mode. Pan or pinch around the complete map.");
+                      }}
+                    >
+                      Navigate
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={mode === "edit"}
+                      disabled={editingDisabled}
+                      className={`pressable min-h-9 rounded-lg px-3 text-sm font-semibold transition-colors disabled:opacity-50 ${mode === "edit" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                      onClick={() => {
+                        setMode("edit");
+                        setMessage("Edit mode. Drag nodes with mouse, touch or pen; tap a node to inspect it.");
+                      }}
+                    >
+                      Edit
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-1 rounded-xl bg-muted/70 p-1" role="group" aria-label="Zoom">
+                    <Button size="sm" variant="ghost" className="pressable h-9 w-9 rounded-lg px-0 text-base" aria-label="Zoom out" onClick={() => zoomBy(1 / 1.25)}>−</Button>
+                    <Button size="sm" variant="ghost" className="pressable h-9 rounded-lg" onClick={() => fitMap()}>Fit</Button>
+                    <Button size="sm" variant="ghost" className="pressable h-9 w-9 rounded-lg px-0 text-base" aria-label="Zoom in" onClick={() => zoomBy(1.25)}>+</Button>
+                  </div>
+                  <Button size="sm" variant="ghost" className="pressable h-9 rounded-lg" disabled={!revisions.length} onClick={undoLastRevision}>
                     Undo
                   </Button>
                 </div>
                 <select
                   aria-label="Scenario preview"
-                  className="min-h-9 rounded-md border bg-background px-2 text-sm"
+                  className="min-h-10 rounded-xl border bg-background px-2.5 text-sm font-medium"
                   value={selectedScenarioId}
                   onChange={(event) => {
                     setSelectedScenarioId(event.target.value);
@@ -621,11 +625,11 @@ export function ScimCanonicalMapWorkspace() {
 
               <div
                 ref={viewportRef}
-                className="h-[62vh] min-h-[440px] overflow-auto rounded-md border bg-slate-100 overscroll-contain"
+                className="flex h-[62vh] min-h-[440px] overflow-auto rounded-2xl border bg-slate-100 overscroll-contain dark:bg-slate-950/60"
                 style={{ touchAction: mode === "navigate" ? "pan-x pan-y pinch-zoom" : "none" }}
               >
                 <div
-                  className="relative mx-auto bg-white shadow-sm"
+                  className="relative m-auto shrink-0 bg-white shadow-sm"
                   style={{
                     width: radialView.canvas.width * zoom,
                     height: radialView.canvas.height * zoom,
