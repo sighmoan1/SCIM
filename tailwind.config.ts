@@ -10,7 +10,22 @@ const config: Config = {
   ],
   theme: {
   	extend: {
+  		fontFamily: {
+  			sans: ['var(--font-sans)', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif']
+  		},
   		colors: {
+  			ok: {
+  				DEFAULT: 'hsl(var(--ok))',
+  				soft: 'hsl(var(--ok-soft))'
+  			},
+  			warn: {
+  				DEFAULT: 'hsl(var(--warn))',
+  				soft: 'hsl(var(--warn-soft))'
+  			},
+  			danger: {
+  				DEFAULT: 'hsl(var(--danger))',
+  				soft: 'hsl(var(--danger-soft))'
+  			},
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
   			card: {
