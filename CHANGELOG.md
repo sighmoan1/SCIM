@@ -2,6 +2,19 @@
 
 Notable application changes are recorded here. The application, SCIM schema and renderer profile are versioned independently.
 
+## 0.7.0 — 2026-07-29
+
+Faithful realisation of the canonical model in *Dealing in Security* (Gupta & Bennett, 2010), after a review found the app modelled only the individual tier. Canonical model, schema 0.2 and the `scim-radial-1` renderer are unchanged; this adds views and authoring over the vocabulary the schema already permitted.
+
+- Added `lib/scim/tiers.ts`: the canonical taxonomy — the **four tiers of cooperation** (individual, group, organisation, nation-state), the **eighteen critical needs** grouped by tier, the **seven layers of provision** (plus island), and the **four service delivery paths** (on-site / grid / delivery / fetch).
+- Made needs assessment **tier-aware** across all eighteen needs (`assessAllTiers`, `assessCanonicalNeed`, `mappedTierIds` in `lib/scim/needs.ts`), keeping the six-ways-to-die individual view intact.
+- Added the **INAM needs matrix** — the second canonical view — at `/matrix`: needs as rows grouped by tier, layers of provision as columns, showing where each vital need is met and where it is not (`lib/scim/inam.ts`, `components/inam-matrix.tsx`).
+- Added a **four-tiers overview** to Home linking to the matrix, so the app no longer presents as individual-only.
+- Made **delivery paths** first-class when authoring dependencies on the map, and shown in the relationship list.
+- Surfaced human↔AI collaboration on the map as a prominent **"Work on this with an AI"** action (the portable text handoff), reinforcing the map as a shared model people and AIs coordinate around; nothing is transmitted implicitly.
+- Added a worked **town example** spanning all four tiers (`lib/scim/town-example.ts`), loadable from More, so the matrix demonstrates the full model.
+- Added a fifth navigation tab (Matrix). Documented in ADR 0007.
+
 ## 0.6.0 — 2026-07-29
 
 Needs-first interface rewrite: the application now leads with the six ways to die rather than with the canonical model machinery.
