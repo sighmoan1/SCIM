@@ -136,32 +136,4 @@ update("docs/implementation-status.md", (source) => {
   return next;
 });
 
-fs.writeFileSync(
-  ".github/workflows/verify.yml",
-  `name: Verify
-
-on:
-  pull_request:
-  push:
-    branches: [main]
-
-jobs:
-  verify:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --no-frozen-lockfile
-      - run: pnpm test
-      - run: pnpm typecheck
-      - run: pnpm build
-`
-);
-fs.unlinkSync("scripts/apply-v071-followup.mjs");
 console.log("Applied v0.7.1 follow-up changes.");
