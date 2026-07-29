@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { Map as MapIcon } from "lucide-react";
+import { Map as MapIcon, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { InamMatrix } from "@/components/inam-matrix";
 import { useScimWorkspace } from "@/components/use-scim-workspace";
@@ -29,26 +29,30 @@ export function MatrixWorkspace() {
         <h1 className="text-[1.6rem] font-bold leading-tight">Needs matrix</h1>
         <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">
           The INAM matrix from <em>Dealing in Security</em>: every vital need as a
-          row, the layers of provision as columns. Read across a row to see where
-          that need is met — and where it isn't. It is the same model as the map,
-          read horizontally instead of centre-out.
+          row and layers of provision as columns. Solid entries meet the need
+          directly; faded entries are traced upstream dependencies.
         </p>
       </header>
 
       {tiersPresent.size <= 1 && (
         <p className="rounded-xl bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
-          This map currently describes mostly the individual tier. Add providers
-          for groups, organisations or the state on the{" "}
-          <Link href="/" className="font-medium underline">
-            Home
+          This map currently describes mostly the individual tier. Use the{" "}
+          <Link href="/build" className="font-medium underline">
+            guided builder
           </Link>{" "}
-          tab to fill more of the matrix.
+          to add group, organisation and nation-state providers.
         </p>
       )}
 
       <InamMatrix document={document} />
 
-      <div>
+      <div className="flex flex-wrap gap-2">
+        <Button asChild variant="outline" className="pressable rounded-xl">
+          <Link href="/build">
+            <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+            Build the wider system
+          </Link>
+        </Button>
         <Button asChild variant="outline" className="pressable rounded-xl">
           <Link href="/map">
             <MapIcon className="mr-2 h-4 w-4" aria-hidden="true" />
