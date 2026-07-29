@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useScimWorkspace } from "@/components/use-scim-workspace";
 import { createPersonalStarterDocument } from "@/lib/scim/personal-starter";
 import { serializeScimAiHandoff } from "@/lib/scim/handoff";
 import { DELIVERY_PATHS } from "@/lib/scim/tiers";
@@ -20,12 +21,7 @@ import { serializeScimRadialSvg } from "@/lib/scim/radial-svg";
 import { ScimDocumentSchema, type ScimDocument, type ScimRadialView } from "@/lib/scim/schema";
 import { removeEntityFromDocument, removeRelationshipFromDocument } from "@/lib/scim/mutations";
 import { applyScenario, propagateCriticalFailures } from "@/lib/scim/simulation";
-import {
-  createScimWorkspaceRevision,
-  loadScimWorkspace,
-  saveScimWorkspace,
-  type ScimWorkspaceRevision,
-} from "@/lib/scim/workspace";
+import type { ScimWorkspaceRevision } from "@/lib/scim/workspace";
 
 const ENTITY_KINDS = [
   "person",
@@ -134,16 +130,19 @@ function revisionSummary(revision: ScimWorkspaceRevision): string {
 }
 
 export function ScimCanonicalMapWorkspace() {
-  const initialDocument = useMemo(() => createPersonalStarterDocument(), []);
-  const [document, setDocument] = useState<ScimDocument>(initialDocument);
-  const [revisions, setRevisions] = useState<ScimWorkspaceRevision[]>([]);
-  const [hydrated, setHydrated] = useState(false);
+  const {
+    document,
+    revisions,
+    hydrated,
+    commitFrom,
+    replaceTransient,
+    undo,
+    documentRef,
+  } = useScimWorkspace();
   const [mode, setMode] = useState<InteractionMode>("navigate");
   const [zoom, setZoom] = useState(1);
   const fittedRef = useRef(false);
-  const [selectedEntityId, setSelectedEntityId] = useState<string>(
-    initialDocument.focusEntityId ?? initialDocument.entities[0]?.id ?? ""
-  );
+  const [selectedEntityId, setSelectedEntityId] = useState<string>("");
   const [selectedScenarioId, setSelectedScenarioId] = useState("");
   const [message, setMessage] = useState("Navigate mode. Pan around the complete map.");
   const [entityDraft, setEntityDraft] = useState<EntityDraft>({
@@ -165,37 +164,19 @@ export function ScimCanonicalMapWorkspace() {
   const viewportRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<SVGSVGElement>(null);
   const dragRef = useRef<DragState | null>(null);
-  const documentRef = useRef(document);
-
-  const setDocumentImmediate = useCallback(
-    (update: ScimDocument | ((current: ScimDocument) => ScimDocument)) => {
-      setDocument((current) => {
-        const next = typeof update === "function" ? update(current) : update;
-        documentRef.current = next;
-        return next;
-      });
-    },
-    []
-  );
-
-  useEffect(() => {
-    documentRef.current = document;
-  }, [document]);
-
-  useEffect(() => {
-    const workspace = loadScimWorkspace(window.localStorage, initialDocument);
-    setDocumentImmediate(workspace.document);
-    setRevisions(workspace.revisions);
-    setSelectedEntityId(
-      workspace.document.focusEntityId ?? workspace.document.entities[0]?.id ?? ""
-    );
-    setHydrated(true);
-  }, [initialDocument, setDocumentImmediate]);
 
   useEffect(() => {
     if (!hydrated) return;
-    saveScimWorkspace(window.localStorage, { document, revisions });
-  }, [document, hydrated, revisions]);
+    if (
+      selectedEntityId &&
+      document.entities.some((entity) => entity.id === selectedEntityId)
+    ) {
+      return;
+    }
+    setSelectedEntityId(
+      document.focusEntityId ?? document.entities[0]?.id ?? ""
+    );
+  }, [document.entities, document.focusEntityId, hydrated, selectedEntityId]);
 
   const radialView = useMemo(
     () => document.views.find((view): view is ScimRadialView => view.type === "radial"),
@@ -253,26 +234,30 @@ export function ScimCanonicalMapWorkspace() {
   const recordAcceptedChange = useCallback(
     (
       before: ScimDocument,
-      afterInput: ScimDocument,
+      after: ScimDocument,
       label: string,
       origin: "human" | "ai" = "human"
     ) => {
-      const after = ScimDocumentSchema.parse(afterInput);
-      const revision = createScimWorkspaceRevision(before, after, { origin, label });
-      setDocumentImmediate(after);
+      const revision = commitFrom(before, after, label, origin);
       if (revision) {
-        setRevisions((current) => [...current, revision].slice(-100));
-        setMessage(`${label} recorded as ${revision.changes.length} canonical change${revision.changes.length === 1 ? "" : "s"}.`);
+        setMessage(
+          label +
+            " recorded as " +
+            revision.changes.length +
+            " canonical change" +
+            (revision.changes.length === 1 ? "" : "s") +
+            "."
+        );
       }
     },
-    [setDocumentImmediate]
+    [commitFrom]
   );
 
   const commit = useCallback(
     (next: ScimDocument, label: string) => {
       recordAcceptedChange(documentRef.current, next, label, "human");
     },
-    [recordAcceptedChange]
+    [documentRef, recordAcceptedChange]
   );
 
   const pointFromEvent = (
@@ -319,8 +304,8 @@ export function ScimCanonicalMapWorkspace() {
     if (!point) return;
     event.preventDefault();
 
-    setDocumentImmediate((current) =>
-      replaceRadialView(current, drag.viewId, (view) => ({
+    replaceTransient(
+      replaceRadialView(documentRef.current, drag.viewId, (view) => ({
         ...view,
         nodes: view.nodes.map((node) =>
           node.entityId === drag.entityId
@@ -343,13 +328,17 @@ export function ScimCanonicalMapWorkspace() {
       drag.capture.releasePointerCapture(event.pointerId);
     }
     const after = ScimDocumentSchema.parse(documentRef.current);
-    const revision = createScimWorkspaceRevision(drag.before, after, {
-      origin: "human",
-      label: `Move ${after.entities.find((entity) => entity.id === drag.entityId)?.name ?? drag.entityId}`,
-    });
-    if (revision) setRevisions((current) => [...current, revision].slice(-100));
+    const label =
+      "Move " +
+      (after.entities.find((entity) => entity.id === drag.entityId)?.name ??
+        drag.entityId);
+    const revision = commitFrom(drag.before, after, label, "human");
     dragRef.current = null;
-    setMessage("Node position recorded as a canonical view change.");
+    setMessage(
+      revision
+        ? "Node position recorded as a canonical view change."
+        : "Node position did not change."
+    );
   };
 
   const saveSelectedEntity = () => {
@@ -463,11 +452,8 @@ export function ScimCanonicalMapWorkspace() {
   };
 
   const undoLastRevision = () => {
-    const revision = revisions.at(-1);
-    if (!revision) return;
-    setDocumentImmediate(revision.before);
-    setRevisions((current) => current.slice(0, -1));
-    setMessage(`Undid: ${revision.label}`);
+    const label = undo();
+    if (label) setMessage("Undid: " + label);
   };
 
   const resetWorkspace = () => {
