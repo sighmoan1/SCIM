@@ -50,7 +50,7 @@ SCIM is pre-1.0. The canonical schema is currently broader than the lossless DSL
 
 Navigation is a five-item bottom tab bar on phones and a top bar on larger screens. The application ships light and dark themes, an installable web app manifest, an animated six-segment resilience ring, and a service worker that caches the application shell and visited same-origin resources for offline startup.
 
-The production application should deploy from `main`. The interface displays application, schema and build information so a deployed build can be checked against the repository commit.
+The production application should deploy from `main`. The interface displays the application and schema versions. Deployment status is verified against the `main` commit through GitHub and Vercel checks.
 
 ## Why this application exists
 
@@ -300,7 +300,7 @@ See [ADR 0004](docs/decisions/0004-browser-local-first-workspace.md).
 
 The original mapper used desktop mouse events and component-local state. A temporary touch-to-mouse bridge improved accessibility but retained the wrong architecture.
 
-The primary `/` route now uses native Pointer Events, pointer capture, explicit Navigate/Edit modes and canonical view revisions. The historical mapper remains at `/legacy` until its specialist capabilities have canonical replacements.
+The primary `/map` route now uses native Pointer Events, pointer capture, explicit Navigate/Edit modes and canonical view revisions. The historical mapper remains at `/legacy` until its specialist capabilities have canonical replacements.
 
 **Consequences:**
 
@@ -371,6 +371,33 @@ The primary interface derives plain-language answers ("Am I protected from thirs
 
 See [ADR 0006](docs/decisions/0006-needs-first-interface.md).
 
+### Decision 14: ground the product in all four canonical tiers
+
+The six individual needs are the accessible entry point, not the whole SCIM model. The canonical taxonomy also includes the needs of groups, organisations and nation-states, alongside layers of provision and service-delivery paths.
+
+**Consequences:**
+
+- Home may foreground individual survival while Matrix and Build expose the wider cooperative system;
+- the same `ScimDocument` supports individual, group, organisational, state and integrated perspectives;
+- supplementary crisis-planning material may extend the workflow but does not redefine the canonical taxonomy;
+- examples and AI handoffs must not imply that SCIM ends with the six ways to die.
+
+See [ADR 0007](docs/decisions/0007-canonical-four-tiers-and-inam.md).
+
+### Decision 15: display INAM as a derived dependency projection
+
+The primary Matrix is calculated from canonical need declarations and directed provider-to-receiver relationships. It shows both direct providers and every traced upstream dependency, grouped by layer. Explicit authored INAM views remain available for specialist layouts and notes, but they do not silently override the derived semantic projection.
+
+**Consequences:**
+
+- the Matrix reveals infrastructure chains rather than only direct need tags;
+- direct and upstream providers remain visibly distinct;
+- relationship direction affects Matrix correctness;
+- view geometry never creates Matrix membership;
+- changes to projection logic require semantic regression tests.
+
+See [ADR 0008](docs/decisions/0008-derived-inam-projection.md).
+
 ## Current architecture
 
 ```text
@@ -409,6 +436,11 @@ lib/scim/diff-apply.ts       selective proposal application
 lib/scim/handoff.ts          portable AI handoff
 lib/scim/proposal.ts         proposal request and response format
 lib/scim/workspace.ts        accepted local state and revisions
+lib/scim/needs.ts            need assessment across four tiers
+lib/scim/tiers.ts            canonical tiers, needs, layers and delivery paths
+lib/scim/inam.ts             direct/upstream Matrix projection
+lib/scim/mutations.ts        referentially safe canonical deletion
+lib/scim/guided-tier.ts      guided higher-tier authoring
 lib/scim/legacy-adapter.ts   historical mapper conversion
 ```
 
