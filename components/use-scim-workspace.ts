@@ -11,26 +11,26 @@ import {
   type ScimWorkspaceRevision,
 } from "@/lib/scim/workspace";
 
-/**
- * Browser-local accepted workspace shared by every screen: one validated
- * document plus its revision history, loaded from and saved to local storage.
- * Every accepted change goes through `commit` so it is validated and recorded
- * with provenance, exactly like edits made on the map.
- */
 export function useScimWorkspace() {
   const fallback = useMemo(() => createPersonalStarterDocument(), []);
   const [document, setDocument] = useState<ScimDocument>(fallback);
   const [revisions, setRevisions] = useState<ScimWorkspaceRevision[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const documentRef = useRef(document);
+  const revisionsRef = useRef(revisions);
 
   useEffect(() => {
     documentRef.current = document;
   }, [document]);
 
   useEffect(() => {
+    revisionsRef.current = revisions;
+  }, [revisions]);
+
+  useEffect(() => {
     const workspace = loadScimWorkspace(window.localStorage, fallback);
     documentRef.current = workspace.document;
+    revisionsRef.current = workspace.revisions;
     setDocument(workspace.document);
     setRevisions(workspace.revisions);
     setHydrated(true);
@@ -54,26 +54,24 @@ export function useScimWorkspace() {
       });
       documentRef.current = after;
       setDocument(after);
-      if (revision) {
-        setRevisions((current) => [...current, revision].slice(-100));
-        return true;
-      }
-      return false;
+      if (!revision) return false;
+      const nextRevisions = [...revisionsRef.current, revision].slice(-100);
+      revisionsRef.current = nextRevisions;
+      setRevisions(nextRevisions);
+      return true;
     },
     []
   );
 
   const undo = useCallback((): string | null => {
-    let undone: string | null = null;
-    setRevisions((current) => {
-      const revision = current.at(-1);
-      if (!revision) return current;
-      undone = revision.label;
-      documentRef.current = revision.before;
-      setDocument(revision.before);
-      return current.slice(0, -1);
-    });
-    return undone;
+    const revision = revisionsRef.current.at(-1);
+    if (!revision) return null;
+    const nextRevisions = revisionsRef.current.slice(0, -1);
+    revisionsRef.current = nextRevisions;
+    documentRef.current = revision.before;
+    setRevisions(nextRevisions);
+    setDocument(revision.before);
+    return revision.label;
   }, []);
 
   return { document, revisions, hydrated, commit, undo, documentRef };
