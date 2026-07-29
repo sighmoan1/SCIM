@@ -13,11 +13,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createDefaultScimDocument } from "@/lib/scim/default-model";
-import { serializeScimAiHandoff } from "@/lib/scim/handoff";
+import { createPersonalStarterDocument } from "@/lib/scim/personal-starter";
 import { serializeScimRadialSvg } from "@/lib/scim/radial-svg";
 import { ScimDocumentSchema, type ScimDocument, type ScimRadialView } from "@/lib/scim/schema";
-import { serializeScimDsl } from "@/lib/scim/serializer";
 import { applyScenario, propagateCriticalFailures } from "@/lib/scim/simulation";
 import {
   createScimWorkspaceRevision,
@@ -97,29 +95,6 @@ function commaList(value: string): string[] {
     .filter(Boolean);
 }
 
-function copyText(value: string): Promise<void> {
-  if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(value);
-  const textarea = document.createElement("textarea");
-  textarea.value = value;
-  textarea.style.position = "fixed";
-  textarea.style.opacity = "0";
-  document.body.appendChild(textarea);
-  textarea.select();
-  document.execCommand("copy");
-  textarea.remove();
-  return Promise.resolve();
-}
-
-function download(filename: string, content: string, type = "text/plain") {
-  const blob = new Blob([content], { type });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-  URL.revokeObjectURL(url);
-}
-
 function replaceRadialView(
   document: ScimDocument,
   viewId: string,
@@ -143,11 +118,13 @@ function revisionSummary(revision: ScimWorkspaceRevision): string {
 }
 
 export function ScimCanonicalMapWorkspace() {
-  const initialDocument = useMemo(() => createDefaultScimDocument(), []);
+  const initialDocument = useMemo(() => createPersonalStarterDocument(), []);
   const [document, setDocument] = useState<ScimDocument>(initialDocument);
   const [revisions, setRevisions] = useState<ScimWorkspaceRevision[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const [mode, setMode] = useState<InteractionMode>("navigate");
+  const [zoom, setZoom] = useState(1);
+  const fittedRef = useRef(false);
   const [selectedEntityId, setSelectedEntityId] = useState<string>(
     initialDocument.focusEntityId ?? initialDocument.entities[0]?.id ?? ""
   );
@@ -504,30 +481,48 @@ export function ScimCanonicalMapWorkspace() {
   };
 
   const resetWorkspace = () => {
-    const next = createDefaultScimDocument();
-    recordAcceptedChange(documentRef.current, next, "Reset to example", "human");
+    const next = createPersonalStarterDocument();
+    recordAcceptedChange(documentRef.current, next, "Reset to starter map", "human");
     setSelectedEntityId(next.focusEntityId ?? next.entities[0]?.id ?? "");
     setSelectedScenarioId("");
   };
 
-  const centreMap = () => {
+  const centreMap = useCallback((behavior: ScrollBehavior = "smooth") => {
     const viewport = viewportRef.current;
     if (!viewport) return;
     viewport.scrollTo({
       left: Math.max(0, (viewport.scrollWidth - viewport.clientWidth) / 2),
       top: Math.max(0, (viewport.scrollHeight - viewport.clientHeight) / 2),
-      behavior: "smooth",
+      behavior,
     });
-  };
+  }, []);
 
-  const copyScim = async () => {
-    await copyText(serializeScimDsl(document));
-    setMessage("Authoritative SCIM source copied.");
-  };
+  const fitMap = useCallback(
+    (behavior: ScrollBehavior = "smooth") => {
+      const viewport = viewportRef.current;
+      const view = documentRef.current.views.find(
+        (candidate): candidate is ScimRadialView => candidate.type === "radial"
+      );
+      if (!viewport || !view) return;
+      const fitted = Math.min(
+        (viewport.clientWidth - 16) / view.canvas.width,
+        (viewport.clientHeight - 16) / view.canvas.height
+      );
+      setZoom(Math.min(2, Math.max(0.25, fitted)));
+      requestAnimationFrame(() => centreMap(behavior));
+    },
+    [centreMap]
+  );
 
-  const copyForAi = async () => {
-    await copyText(serializeScimAiHandoff(document));
-    setMessage("Text-first SCIM handoff copied for an AI conversation.");
+  // Open with the whole map visible instead of a corner of the canvas.
+  useEffect(() => {
+    if (!hydrated || fittedRef.current) return;
+    fittedRef.current = true;
+    fitMap("auto");
+  }, [hydrated, fitMap]);
+
+  const zoomBy = (factor: number) => {
+    setZoom((current) => Math.min(2, Math.max(0.25, current * factor)));
   };
 
   if (!radialView) {
@@ -551,18 +546,12 @@ export function ScimCanonicalMapWorkspace() {
     <div className="space-y-3 p-3 pb-12 md:p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold">Canonical SCIM map</h1>
+          <h1 className="text-xl font-semibold">Your map</h1>
           <p className="max-w-3xl text-sm text-muted-foreground">
-            Manual edits and accepted AI proposals update the same text-first model and use the same reviewable change operations.
+            You are at the centre. Each ring is a layer of the world around you — household,
+            neighbourhood, town and beyond — and the six dangers sit around the edge. Arrows show
+            what supplies what.
           </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={copyScim}>Copy SCIM</Button>
-          <Button variant="outline" onClick={copyForAi}>Copy for AI</Button>
-          <Button variant="outline" onClick={() => download(`${document.id}.scim`, serializeScimDsl(document))}>
-            Download
-          </Button>
-          <Button asChild><Link href="/review">Review AI proposal</Link></Button>
         </div>
       </div>
 
@@ -595,7 +584,9 @@ export function ScimCanonicalMapWorkspace() {
                   >
                     Edit map
                   </Button>
-                  <Button size="sm" variant="outline" onClick={centreMap}>Centre</Button>
+                  <Button size="sm" variant="outline" aria-label="Zoom out" onClick={() => zoomBy(1 / 1.25)}>−</Button>
+                  <Button size="sm" variant="outline" aria-label="Zoom in" onClick={() => zoomBy(1.25)}>+</Button>
+                  <Button size="sm" variant="outline" onClick={() => fitMap()}>Fit</Button>
                   <Button size="sm" variant="outline" disabled={!revisions.length} onClick={undoLastRevision}>
                     Undo
                   </Button>
@@ -635,7 +626,10 @@ export function ScimCanonicalMapWorkspace() {
               >
                 <div
                   className="relative mx-auto bg-white shadow-sm"
-                  style={{ width: radialView.canvas.width, height: radialView.canvas.height }}
+                  style={{
+                    width: radialView.canvas.width * zoom,
+                    height: radialView.canvas.height * zoom,
+                  }}
                 >
                   <div
                     aria-hidden="true"
@@ -796,12 +790,12 @@ export function ScimCanonicalMapWorkspace() {
           </Card>
 
           <Card>
-            <CardContent className="space-y-2 p-3 text-sm">
-              <p>The complete legacy mapper remains available while its remaining specialist controls are migrated onto canonical SCIM state.</p>
-              <div className="flex flex-wrap gap-2">
-                <Button asChild variant="outline"><Link href="/legacy">Open legacy mapper</Link></Button>
-                <Button variant="outline" onClick={resetWorkspace}>Reset example</Button>
-              </div>
+            <CardContent className="space-y-2 p-3 text-sm text-muted-foreground">
+              <p>
+                Exports, AI collaboration and the legacy mapper live under{" "}
+                <Link className="font-medium underline" href="/more">More</Link>.
+              </p>
+              <Button variant="outline" onClick={resetWorkspace}>Reset to starter map</Button>
             </CardContent>
           </Card>
         </aside>

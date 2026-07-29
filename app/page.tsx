@@ -1,5 +1,5 @@
-import { ScimCanonicalMapWorkspace } from "@/components/scim-canonical-map-workspace";
+import { HomeDashboard } from "@/components/home-dashboard";
 
 export default function Page() {
-  return <ScimCanonicalMapWorkspace />;
+  return <HomeDashboard />;
 }

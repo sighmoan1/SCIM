@@ -18,7 +18,7 @@ SCIM is **not** a generic flowchart editor. The diagram is one view over a struc
 
 ## Current versions
 
-- Application: **0.5.0**
+- Application: **0.6.0**
 - Portable SCIM schema/language: **0.2**
 - Radial renderer profile: **`scim-radial-1`**
 
@@ -38,10 +38,15 @@ SCIM is pre-1.0. The canonical schema is currently broader than the lossless DSL
 
 | Route | Purpose |
 | --- | --- |
-| `/` | Primary canonical visual map, native pointer editing, scenarios, revisions and exports |
+| `/` | Home dashboard: live protected/at-risk status for the six needs, plain-language explanations and a guided per-need builder |
+| `/emergency` | Mobile-first emergency workspace: report infrastructure down, see propagated impact on needs and surviving backups |
+| `/map` | Interactive canonical radial map with zoom/fit, native pointer editing, scenarios and revisions |
+| `/more` | Plain-language SCIM explanation, AI collaboration, export/backup, examples and advanced-tool links |
 | `/editor` | Advanced SCIM text authoring, validation, deterministic preview and exports |
 | `/review` | Compare and selectively accept a complete human or AI candidate model |
 | `/legacy` | Preserved original mapper while specialist controls are migrated |
+
+Navigation is a bottom tab bar on phones (Home, Map, Emergency, More) and a top bar on larger screens.
 
 The production application should deploy from `main`. The interface displays application, schema and build information so a deployed build can be checked against the repository commit.
 
@@ -351,6 +356,19 @@ SCIM is being developed iteratively. The repository distinguishes:
 
 See [`docs/implementation-status.md`](docs/implementation-status.md).
 
+### Decision 13: lead the interface with the six needs
+
+The primary interface derives plain-language answers ("Am I protected from thirst?", "What did this failure put at risk?") from the canonical model, instead of opening on model machinery. The Home dashboard and Emergency workspace are read-only projections plus ordinary revisions; the canonical map, text editor and review workflow remain first-class underneath.
+
+**Consequences:**
+
+- need status is presentation logic, not a schema concept;
+- guided additions produce complete validated canonical changes;
+- emergency status reports share the same revision history as map edits;
+- the fresh-workspace default is a personal household starter model.
+
+See [ADR 0006](docs/decisions/0006-needs-first-interface.md).
+
 ## Current architecture
 
 ```text
@@ -438,6 +456,14 @@ Evidence exists in the canonical JSON schema, but SCIM DSL 0.2 does not yet pres
 - record accepted AI work in the same revision history as manual edits.
 
 ## Primary user journeys
+
+### Understand your own resilience (start here)
+
+Open the Home dashboard. Each of the six needs shows what currently protects it and whether that protection is working. Tap a need, answer its plain-language question ("Where does your drinking water come from?") and add the things you actually rely on — suggestions create the entity, its typical upstream dependency, the protecting relationship and a deterministic radial placement as one validated revision.
+
+### Respond during a failure
+
+Open Emergency on a phone. Mark what has stopped working with large touch targets. The app propagates critical failures through the canonical model, shows which of the six needs are now at risk and why, and highlights backups that still work. Every report is an ordinary human-origin revision: undoable, attributable and visible on the map.
 
 ### Build a map manually
 

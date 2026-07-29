@@ -2,8 +2,18 @@
 
 Notable application changes are recorded here. The application, SCIM schema and renderer profile are versioned independently.
 
-## Unreleased
+## 0.6.0 — 2026-07-29
 
+Needs-first interface rewrite: the application now leads with the six ways to die rather than with the canonical model machinery.
+
+- Added a Home dashboard at `/` that shows live protected / at-risk / unprotected status for each of the six needs, grouped by Shelter, Supply and Safety, with plain-language explanations derived from the canonical document and failure propagation.
+- Added a guided builder inside each need card: tap-to-add common protections (with their typical upstream dependency) or a custom protector; entities, relationships and deterministic radial placement are created as one validated canonical revision.
+- Added a mobile-first Emergency workspace at `/emergency`: mark infrastructure Working / Struggling / Down with large touch targets, see which needs are now at risk and why, see surviving backups, undo, and one-tap all clear. Status reports are ordinary human-origin semantic revisions.
+- Moved the interactive radial map to `/map`, added zoom in/out and fit-to-screen (the whole map is now visible on a phone by default), and rewrote its copy in plain language.
+- Added `/more`: a plain-language explanation of SCIM, AI collaboration and export actions moved out of the map header, links to the advanced editor/review/legacy tools, example loading, and version information.
+- Added bottom tab navigation on phones and a top bar on larger screens.
+- Added a personal household starter model (`my-resilience`) as the fresh-workspace default, including a ready-made power-cut scenario; the hospital example remains loadable from More.
+- Added `lib/scim/needs.ts` (derived need assessment) and `lib/scim/guided.ts` (suggestions and deterministic placement). Both are read-only or produce complete validated documents; the canonical model, schema 0.2, DSL and `scim-radial-1` renderer are unchanged.
 - Added comprehensive documentation for contributors, architecture, security, testing, mobile interaction, AI collaboration, workspace history and future work.
 - Updated the README and current workspace guides.
 
