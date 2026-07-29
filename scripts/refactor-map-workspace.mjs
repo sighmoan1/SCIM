@@ -72,9 +72,12 @@ replace(
       const revision = commitFrom(before, after, label, origin);
       if (revision) {
         setMessage(
-          \`${label} recorded as \${revision.changes.length} canonical change\${
-            revision.changes.length === 1 ? "" : "s"
-          }.\`
+          label +
+            " recorded as " +
+            revision.changes.length +
+            " canonical change" +
+            (revision.changes.length === 1 ? "" : "s") +
+            "."
         );
       }
     },
@@ -112,10 +115,10 @@ replace(
 replace(
   /    const after = ScimDocumentSchema\.parse\(documentRef\.current\);\n    const revision = createScimWorkspaceRevision\(drag\.before, after, \{[\s\S]*?    setMessage\("Node position recorded as a canonical view change\."\);/,
   `    const after = ScimDocumentSchema.parse(documentRef.current);
-    const label = \`Move \${
-      after.entities.find((entity) => entity.id === drag.entityId)?.name ??
-      drag.entityId
-    }\`;
+    const label =
+      "Move " +
+      (after.entities.find((entity) => entity.id === drag.entityId)?.name ??
+        drag.entityId);
     const revision = commitFrom(drag.before, after, label, "human");
     dragRef.current = null;
     setMessage(
@@ -129,7 +132,7 @@ replace(
   /  const undoLastRevision = \(\) => \{\n    const revision = revisions\.at\(-1\);\n    if \(!revision\) return;\n    setDocumentImmediate\(revision\.before\);\n    setRevisions\(\(current\) => current\.slice\(0, -1\)\);\n    setMessage\(`Undid: \$\{revision\.label\}`\);\n  \};/,
   `  const undoLastRevision = () => {
     const label = undo();
-    if (label) setMessage(\`Undid: \${label}\`);
+    if (label) setMessage("Undid: " + label);
   };`,
   "shared undo"
 );
