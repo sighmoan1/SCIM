@@ -1,6 +1,6 @@
 {
   "name": "SCIM",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "verify": "pnpm typecheck && pnpm build"
+    "test": "rm -rf .test-build && tsc -p tsconfig.test.json && node --test .test-build/tests/*.test.js",
+    "verify": "pnpm test && pnpm typecheck && pnpm build"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
