@@ -1,23 +1,49 @@
 # User guide
 
-Status: current application 0.5.0.
+Status: current application 0.6.0.
 
 ## Choose a workspace
 
 | Workspace | Use it for |
 | --- | --- |
-| **Map** `/` | visual modelling, mobile interaction, scenarios, history and export |
+| **Home** `/` | seeing whether each of the six needs is protected, and adding what protects you |
+| **Emergency** `/emergency` | reporting failures during an incident and seeing what they put at risk |
+| **Map** `/map` | visual modelling, mobile interaction, scenarios, history |
+| **More** `/more` | what SCIM is, AI collaboration, export/backup, examples, advanced tools |
 | **Model** `/editor` | direct SCIM text editing, validation, deterministic preview and format exports |
 | **Review proposals** `/review` | reviewing a complete human or AI candidate against the accepted map |
 | **Legacy** `/legacy` | specialist original-mapper functions not yet migrated to canonical state |
 
-## Start with the Map
+On a phone the four primary workspaces are a bottom tab bar.
 
-The Map loads a synthetic example when no accepted browser-local model exists.
+## Start with Home
 
-The accepted model is saved in the current browser profile. Export SCIM for durable backup or use on another device.
+Home shows the six ways to die — too hot, too cold, hunger, thirst, illness, injury — grouped by the service family that protects against each (Shelter, Supply, Safety). Each need shows a live status:
+
+- **Protected** — at least one mapped protector, all working;
+- **At risk** — a protector or one of its critical suppliers is down or struggling, but something still works;
+- **Unprotected** — everything mapped for that need is down;
+- **Not mapped yet** — you have not recorded anything for that need.
+
+Tap a need to see its protectors and their supply problems, then add what you actually rely on. Suggestions create the protector, its typical upstream dependency, the protecting relationship and a radial placement as one validated human-origin revision. A fresh workspace starts from a synthetic household starter model you should edit to match your life.
+
+## Use Emergency during a failure
+
+Open `/emergency` when something breaks.
+
+1. Find the thing that failed and tap **Down** (or **Struggling**).
+2. Read the impact panel: which needs are now at risk, why, and which backups still work.
+3. Tap **Working** (or **Undo**) when service is restored, or **All clear** to reset everything.
+
+Each report is an ordinary semantic revision in the same history as map edits: attributable, undoable and visible on the Map. The status engine is conservative and status-based; it does not model time, capacity or probability.
+
+## The accepted model and backups
+
+The accepted model is saved in the current browser profile. Export SCIM (from **More**) for durable backup or use on another device.
 
 ## Navigate the map
+
+Open `/map`. The map opens fitted to your screen; use **+**, **−** and **Fit** to zoom.
 
 Use **Navigate** mode to:
 
