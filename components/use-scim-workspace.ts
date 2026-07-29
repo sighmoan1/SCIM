@@ -41,27 +41,48 @@ export function useScimWorkspace() {
     saveScimWorkspace(window.localStorage, { document, revisions });
   }, [document, hydrated, revisions]);
 
-  const commit = useCallback(
+  const commitFrom = useCallback(
     (
+      beforeInput: ScimDocument,
       next: ScimDocument,
       label: string,
       origin: ScimRevisionOrigin = "human"
-    ): boolean => {
+    ): ScimWorkspaceRevision | null => {
+      const before = ScimDocumentSchema.parse(beforeInput);
       const after = ScimDocumentSchema.parse(next);
-      const revision = createScimWorkspaceRevision(documentRef.current, after, {
+      const revision = createScimWorkspaceRevision(before, after, {
         origin,
         label,
       });
       documentRef.current = after;
       setDocument(after);
-      if (!revision) return false;
+      if (!revision) return null;
       const nextRevisions = [...revisionsRef.current, revision].slice(-100);
       revisionsRef.current = nextRevisions;
       setRevisions(nextRevisions);
-      return true;
+      return revision;
     },
     []
   );
+
+  const commit = useCallback(
+    (
+      next: ScimDocument,
+      label: string,
+      origin: ScimRevisionOrigin = "human"
+    ): boolean => Boolean(commitFrom(documentRef.current, next, label, origin)),
+    [commitFrom]
+  );
+
+  /**
+   * Replace the current document during a live interaction. The caller must
+   * commit the completed gesture once with commitFrom to create one revision.
+   */
+  const replaceTransient = useCallback((next: ScimDocument): void => {
+    const parsed = ScimDocumentSchema.parse(next);
+    documentRef.current = parsed;
+    setDocument(parsed);
+  }, []);
 
   const undo = useCallback((): string | null => {
     const revision = revisionsRef.current.at(-1);
@@ -74,5 +95,14 @@ export function useScimWorkspace() {
     return revision.label;
   }, []);
 
-  return { document, revisions, hydrated, commit, undo, documentRef };
+  return {
+    document,
+    revisions,
+    hydrated,
+    commit,
+    commitFrom,
+    replaceTransient,
+    undo,
+    documentRef,
+  };
 }
