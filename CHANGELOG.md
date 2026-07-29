@@ -2,6 +2,22 @@
 
 Notable application changes are recorded here. The application, SCIM schema and renderer profile are versioned independently.
 
+## 0.7.1 — 2026-07-29
+
+Hardening release. SCIM schema remains 0.2 and the `scim-radial-1` renderer profile is unchanged.
+
+- Corrected degraded/“Struggling” semantics: impaired infrastructure remains available but places the supported need at risk, instead of being treated as completely absent.
+- Changed the displayed INAM matrix into a deterministic dependency projection containing direct providers and traced upstream providers, with their effective status and graph distance.
+- Added referentially safe canonical entity and relationship deletion covering scenarios, radial routes and explicit INAM cells.
+- Consolidated Home, Emergency, Map, Matrix and More on one transactional browser-local workspace API; completed pointer drags create one view revision.
+- Fixed shared-workspace undo so its revision label is returned synchronously and revision state cannot lag React state.
+- Added a guided `/build` workflow for group, organisation and nation-state needs.
+- Added service-worker application-shell caching and an explicit offline-state banner.
+- Added Node-native semantic regression tests for need status, mutation safety, INAM projection and starter-model text round trips.
+- Made tests part of `pnpm verify` and GitHub Actions.
+
+Persistence keys and AI disclosure boundaries are unchanged. The advanced Model editor still requires an explicit reviewed replacement flow before it can transactionally replace accepted workspace state.
+
 ## 0.7.0 — 2026-07-29
 
 Faithful realisation of the canonical model in *Dealing in Security* (Gupta & Bennett, 2010), after a review found the app modelled only the individual tier. Canonical model, schema 0.2 and the `scim-radial-1` renderer are unchanged; this adds views and authoring over the vocabulary the schema already permitted.

@@ -52,6 +52,9 @@ Architecture decisions are captured under [`decisions/`](decisions/):
 - [`0003-ai-output-is-a-proposal.md`](decisions/0003-ai-output-is-a-proposal.md)
 - [`0004-browser-local-first-workspace.md`](decisions/0004-browser-local-first-workspace.md)
 - [`0005-native-pointer-events-and-legacy-preservation.md`](decisions/0005-native-pointer-events-and-legacy-preservation.md)
+- [`0006-needs-first-interface.md`](decisions/0006-needs-first-interface.md)
+- [`0007-canonical-four-tiers-and-inam.md`](decisions/0007-canonical-four-tiers-and-inam.md)
+- [`0008-derived-inam-projection.md`](decisions/0008-derived-inam-projection.md)
 
 ## Examples
 

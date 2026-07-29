@@ -10,18 +10,6 @@ import {
   type TierId,
 } from "./tiers";
 
-/**
- * Plain-language presentation of the six ways to die from the original SCIM
- * publication ("Dealing in Security", 2010): shelter protects from too hot and
- * too cold, supply protects from hunger and thirst, safety protects from
- * illness and injury.
- *
- * This module derives read-only presentation state from the canonical
- * document. It never mutates accepted state. The six-ways-to-die exports below
- * cover the individual tier; the tier-aware assessment (assessNeeds) covers the
- * full eighteen canonical needs across all four tiers.
- */
-
 export type NeedFamilyId = "shelter" | "supply" | "safety";
 
 export interface NeedFamily {
@@ -39,21 +27,9 @@ export interface ThreatDefinition {
 }
 
 export const NEED_FAMILIES: NeedFamily[] = [
-  {
-    id: "shelter",
-    label: "Shelter",
-    summary: "Keeps your body at a safe temperature",
-  },
-  {
-    id: "supply",
-    label: "Supply",
-    summary: "Keeps you fed and hydrated",
-  },
-  {
-    id: "safety",
-    label: "Safety",
-    summary: "Protects you from illness and injury",
-  },
+  { id: "shelter", label: "Shelter", summary: "Keeps your body at a safe temperature" },
+  { id: "supply", label: "Supply", summary: "Keeps you fed and hydrated" },
+  { id: "safety", label: "Safety", summary: "Protects you from illness and injury" },
 ];
 
 export const SIX_THREATS: ThreatDefinition[] = [
@@ -105,13 +81,9 @@ export type NeedStatus = "protected" | "at-risk" | "unprotected" | "unmapped";
 
 export interface ProtectorAssessment {
   entity: ScimEntity;
-  /** Status recorded in the accepted document. */
   reportedStatus: EntityStatus;
-  /** Status after critical-failure propagation. */
   effectiveStatus: EntityStatus;
-  /** Working means the protector still functions after propagation. */
   working: boolean;
-  /** Plain notes about this protector's own critical suppliers. */
   supplyNotes: string[];
 }
 
@@ -119,14 +91,12 @@ export interface NeedAssessment {
   threat: ThreatDefinition;
   status: NeedStatus;
   protectors: ProtectorAssessment[];
-  /** Protectors that still work after propagation. */
   workingProtectors: ProtectorAssessment[];
 }
 
 export interface DocumentAssessment {
   needs: NeedAssessment[];
   propagation: SimulationResult;
-  /** Effective entity status by ID after propagation. */
   effectiveStatuses: Map<string, EntityStatus>;
   counts: {
     protected: number;
@@ -137,13 +107,14 @@ export interface DocumentAssessment {
 }
 
 function protectsNeed(entity: ScimEntity, needId: string): boolean {
-  return (
-    entity.supportsNeeds.includes(needId) ||
-    entity.protectsAgainst.includes(needId)
-  );
+  return entity.supportsNeeds.includes(needId) || entity.protectsAgainst.includes(needId);
 }
 
-const STATUS_AVAILABLE: ReadonlySet<EntityStatus> = new Set(["normal", "new"]);
+const STATUS_AVAILABLE: ReadonlySet<EntityStatus> = new Set([
+  "normal",
+  "degraded",
+  "new",
+]);
 
 interface AssessmentContext {
   effectiveStatuses: Map<string, EntityStatus>;
@@ -158,21 +129,27 @@ function buildContext(document: ScimDocument): {
   const effectiveStatuses = new Map<string, EntityStatus>(
     propagation.document.entities.map((entity) => [entity.id, entity.status])
   );
-  const baselineEntities = new Map(
-    document.entities.map((entity) => [entity.id, entity])
-  );
-  return { propagation, context: { effectiveStatuses, baselineEntities } };
+  return {
+    propagation,
+    context: {
+      effectiveStatuses,
+      baselineEntities: new Map(document.entities.map((entity) => [entity.id, entity])),
+    },
+  };
 }
 
-/** Assess the protectors of one need id and derive its status. */
 function assessProtectors(
   document: ScimDocument,
   needId: string,
   { effectiveStatuses, baselineEntities }: AssessmentContext
-): { status: NeedStatus; protectors: ProtectorAssessment[]; working: ProtectorAssessment[] } {
-  const protectors: ProtectorAssessment[] = document.entities
+): {
+  status: NeedStatus;
+  protectors: ProtectorAssessment[];
+  working: ProtectorAssessment[];
+} {
+  const protectors = document.entities
     .filter((entity) => protectsNeed(entity, needId))
-    .map((entity) => {
+    .map((entity): ProtectorAssessment => {
       const effectiveStatus = effectiveStatuses.get(entity.id) ?? entity.status;
       const supplyNotes: string[] = [];
       for (const relationship of document.relationships) {
@@ -182,7 +159,10 @@ function assessProtectors(
         const sourceStatus = effectiveStatuses.get(source.id) ?? source.status;
         if (sourceStatus === "failed" || relationship.status === "failed") {
           supplyNotes.push(`${source.name} is down`);
-        } else if (sourceStatus === "degraded" || relationship.status === "degraded") {
+        } else if (
+          sourceStatus === "degraded" ||
+          relationship.status === "degraded"
+        ) {
           supplyNotes.push(`${source.name} is struggling`);
         }
       }
@@ -196,15 +176,17 @@ function assessProtectors(
     });
 
   const working = protectors.filter((protector) => protector.working);
-
   let status: NeedStatus;
   if (!protectors.length) {
     status = "unmapped";
   } else if (!working.length) {
     status = "unprotected";
   } else if (
-    protectors.some((protector) => !protector.working) ||
-    working.some((protector) => protector.supplyNotes.length)
+    protectors.some(
+      (protector) =>
+        !protector.working || protector.effectiveStatus === "degraded"
+    ) ||
+    working.some((protector) => protector.supplyNotes.length > 0)
   ) {
     status = "at-risk";
   } else {
@@ -225,8 +207,7 @@ function tallyCounts(statuses: NeedStatus[]) {
 
 export function assessDocument(document: ScimDocument): DocumentAssessment {
   const { propagation, context } = buildContext(document);
-
-  const needs: NeedAssessment[] = SIX_THREATS.map((threat) => {
+  const needs = SIX_THREATS.map((threat): NeedAssessment => {
     const { status, protectors, working } = assessProtectors(
       document,
       threat.id,
@@ -234,7 +215,6 @@ export function assessDocument(document: ScimDocument): DocumentAssessment {
     );
     return { threat, status, protectors, workingProtectors: working };
   });
-
   return {
     needs,
     propagation,
@@ -242,8 +222,6 @@ export function assessDocument(document: ScimDocument): DocumentAssessment {
     counts: tallyCounts(needs.map((need) => need.status)),
   };
 }
-
-// --- Tier-aware assessment across all eighteen canonical needs -------------
 
 export interface CanonicalNeedAssessment {
   need: CanonicalNeed;
@@ -258,7 +236,6 @@ export interface TierAssessment {
   summary: string;
   needs: CanonicalNeedAssessment[];
   counts: ReturnType<typeof tallyCounts>;
-  /** True when the map has at least one protector for any need in this tier. */
   mapped: boolean;
 }
 
@@ -269,18 +246,17 @@ export interface FullAssessment {
   counts: ReturnType<typeof tallyCounts>;
 }
 
-/** Assess every canonical need, grouped by the four tiers of cooperation. */
 export function assessAllTiers(document: ScimDocument): FullAssessment {
   const { propagation, context } = buildContext(document);
-
-  const tiers: TierAssessment[] = TIERS.map((tier) => {
-    const needs: CanonicalNeedAssessment[] = needsForTier(tier.id).map((need) => {
-      const { status, protectors, working } = assessProtectors(
-        document,
-        need.id,
-        context
-      );
-      return { need, status, protectors, workingProtectors: working };
+  const tiers = TIERS.map((tier): TierAssessment => {
+    const needs = needsForTier(tier.id).map((need): CanonicalNeedAssessment => {
+      const result = assessProtectors(document, need.id, context);
+      return {
+        need,
+        status: result.status,
+        protectors: result.protectors,
+        workingProtectors: result.working,
+      };
     });
     return {
       tier: tier.id,
@@ -291,20 +267,15 @@ export function assessAllTiers(document: ScimDocument): FullAssessment {
       mapped: needs.some((need) => need.status !== "unmapped"),
     };
   });
-
-  const allStatuses = tiers.flatMap((tier) =>
-    tier.needs.map((need) => need.status)
-  );
-
+  const statuses = tiers.flatMap((tier) => tier.needs.map((need) => need.status));
   return {
     tiers,
     propagation,
     effectiveStatuses: context.effectiveStatuses,
-    counts: tallyCounts(allStatuses),
+    counts: tallyCounts(statuses),
   };
 }
 
-/** Assess a single canonical need by id (any tier). */
 export function assessCanonicalNeed(
   document: ScimDocument,
   needId: string
@@ -312,32 +283,25 @@ export function assessCanonicalNeed(
   const need = canonicalNeed(needId);
   if (!need) return null;
   const { context } = buildContext(document);
-  const { status, protectors, working } = assessProtectors(
-    document,
-    needId,
-    context
-  );
-  return { need, status, protectors, workingProtectors: working };
+  const result = assessProtectors(document, needId, context);
+  return {
+    need,
+    status: result.status,
+    protectors: result.protectors,
+    workingProtectors: result.working,
+  };
 }
 
-/** Canonical needs that appear in this document, by tier presence. */
 export function mappedTierIds(document: ScimDocument): Set<TierId> {
   const present = new Set<TierId>();
   for (const need of CANONICAL_NEEDS) {
-    if (
-      document.entities.some((entity) => protectsNeed(entity, need.id))
-    ) {
+    if (document.entities.some((entity) => protectsNeed(entity, need.id))) {
       present.add(need.tier);
     }
   }
   return present;
 }
 
-/**
- * Infrastructure the user can report on during an emergency: everything in the
- * model except people. Sorted nearest layer first so the things a person can
- * check directly (their home, their street) come before distant systems.
- */
 export function listInfrastructure(document: ScimDocument): ScimEntity[] {
   return document.entities
     .filter((entity) => entity.kind !== "person")
@@ -347,7 +311,6 @@ export function listInfrastructure(document: ScimDocument): ScimEntity[] {
     );
 }
 
-/** Needs an entity helps protect, directly or by supplying a protector. */
 export function needsAffectedBy(
   document: ScimDocument,
   entityId: string
@@ -360,14 +323,12 @@ export function needsAffectedBy(
     const currentId = queue.shift();
     if (!currentId || visited.has(currentId)) continue;
     visited.add(currentId);
-
     const entity = document.entities.find((candidate) => candidate.id === currentId);
     if (entity) {
       for (const need of CANONICAL_NEEDS) {
         if (protectsNeed(entity, need.id)) affected.add(need.id);
       }
     }
-
     for (const relationship of document.relationships) {
       if (relationship.from === currentId) queue.push(relationship.to);
     }

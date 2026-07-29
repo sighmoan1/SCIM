@@ -106,6 +106,12 @@ function ThemeSwitcher() {
 
 const ADVANCED_TOOLS = [
   {
+    href: "/build",
+    icon: FlaskConical,
+    title: "Build wider system",
+    description: "Add group, organisation and nation-state needs",
+  },
+  {
     href: "/editor",
     icon: FileText,
     title: "Model editor",

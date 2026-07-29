@@ -11,26 +11,26 @@ import {
   type ScimWorkspaceRevision,
 } from "@/lib/scim/workspace";
 
-/**
- * Browser-local accepted workspace shared by every screen: one validated
- * document plus its revision history, loaded from and saved to local storage.
- * Every accepted change goes through `commit` so it is validated and recorded
- * with provenance, exactly like edits made on the map.
- */
 export function useScimWorkspace() {
   const fallback = useMemo(() => createPersonalStarterDocument(), []);
   const [document, setDocument] = useState<ScimDocument>(fallback);
   const [revisions, setRevisions] = useState<ScimWorkspaceRevision[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const documentRef = useRef(document);
+  const revisionsRef = useRef(revisions);
 
   useEffect(() => {
     documentRef.current = document;
   }, [document]);
 
   useEffect(() => {
+    revisionsRef.current = revisions;
+  }, [revisions]);
+
+  useEffect(() => {
     const workspace = loadScimWorkspace(window.localStorage, fallback);
     documentRef.current = workspace.document;
+    revisionsRef.current = workspace.revisions;
     setDocument(workspace.document);
     setRevisions(workspace.revisions);
     setHydrated(true);
@@ -41,40 +41,68 @@ export function useScimWorkspace() {
     saveScimWorkspace(window.localStorage, { document, revisions });
   }, [document, hydrated, revisions]);
 
-  const commit = useCallback(
+  const commitFrom = useCallback(
     (
+      beforeInput: ScimDocument,
       next: ScimDocument,
       label: string,
       origin: ScimRevisionOrigin = "human"
-    ): boolean => {
+    ): ScimWorkspaceRevision | null => {
+      const before = ScimDocumentSchema.parse(beforeInput);
       const after = ScimDocumentSchema.parse(next);
-      const revision = createScimWorkspaceRevision(documentRef.current, after, {
+      const revision = createScimWorkspaceRevision(before, after, {
         origin,
         label,
       });
       documentRef.current = after;
       setDocument(after);
-      if (revision) {
-        setRevisions((current) => [...current, revision].slice(-100));
-        return true;
-      }
-      return false;
+      if (!revision) return null;
+      const nextRevisions = [...revisionsRef.current, revision].slice(-100);
+      revisionsRef.current = nextRevisions;
+      setRevisions(nextRevisions);
+      return revision;
     },
     []
   );
 
-  const undo = useCallback((): string | null => {
-    let undone: string | null = null;
-    setRevisions((current) => {
-      const revision = current.at(-1);
-      if (!revision) return current;
-      undone = revision.label;
-      documentRef.current = revision.before;
-      setDocument(revision.before);
-      return current.slice(0, -1);
-    });
-    return undone;
+  const commit = useCallback(
+    (
+      next: ScimDocument,
+      label: string,
+      origin: ScimRevisionOrigin = "human"
+    ): boolean => Boolean(commitFrom(documentRef.current, next, label, origin)),
+    [commitFrom]
+  );
+
+  /**
+   * Replace the current document during a live interaction. The caller must
+   * commit the completed gesture once with commitFrom to create one revision.
+   */
+  const replaceTransient = useCallback((next: ScimDocument): void => {
+    const parsed = ScimDocumentSchema.parse(next);
+    documentRef.current = parsed;
+    setDocument(parsed);
   }, []);
 
-  return { document, revisions, hydrated, commit, undo, documentRef };
+  const undo = useCallback((): string | null => {
+    const revision = revisionsRef.current.at(-1);
+    if (!revision) return null;
+    const nextRevisions = revisionsRef.current.slice(0, -1);
+    revisionsRef.current = nextRevisions;
+    documentRef.current = revision.before;
+    setRevisions(nextRevisions);
+    setDocument(revision.before);
+    return revision.label;
+  }, []);
+
+  return {
+    document,
+    revisions,
+    hydrated,
+    commit,
+    commitFrom,
+    replaceTransient,
+    undo,
+    documentRef,
+  };
 }
