@@ -1,7 +1,7 @@
 {
   "name": "SCIM — Simple Critical Infrastructure Mapper",
   "short_name": "SCIM",
-  "description": "Map the infrastructure that protects you from the six ways to die, see what it depends on, and know what to do when it fails.",
+  "description": "Map the infrastructure and social systems that meet vital needs, test failures, and plan resilient responses.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f7fbfa",
