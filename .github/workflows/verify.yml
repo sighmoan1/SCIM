@@ -33,6 +33,12 @@ jobs:
         run: |
           git config user.name "SCIM release automation"
           git config user.email "actions@users.noreply.github.com"
-          git add -A
+          git add \
+            components/scim-canonical-map-workspace.tsx \
+            components/home-dashboard.tsx \
+            components/more-page.tsx \
+            README.md \
+            docs/architecture.md \
+            docs/implementation-status.md
           git commit -m "Complete SCIM v0.7.1 hardening integration"
           git push origin HEAD:hardening/v0.7.1
