@@ -35,7 +35,6 @@
     --chart-4: 200 65% 45%;
     --chart-5: 27 87% 67%;
     --radius: 0.75rem;
-    /* Semantic status colours shared by both themes */
     --ok: 158 70% 32%;
     --ok-soft: 152 55% 94%;
     --warn: 36 90% 38%;
@@ -83,22 +82,27 @@
   }
   html {
     -webkit-text-size-adjust: 100%;
+    min-width: 320px;
   }
   body {
     @apply bg-background text-foreground antialiased;
+    min-width: 320px;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     text-rendering: optimizeLegibility;
   }
   h1, h2, h3 {
     letter-spacing: -0.02em;
   }
-  button {
+  button,
+  a,
+  input,
+  select,
+  textarea {
     touch-action: manipulation;
   }
 }
 
 @layer utilities {
-  /* Soft elevation used on cards and floating chrome */
   .shadow-soft {
     box-shadow:
       0 1px 2px 0 rgb(16 40 35 / 0.05),
@@ -109,7 +113,6 @@
       0 1px 2px 0 rgb(0 0 0 / 0.4),
       0 4px 20px -4px rgb(0 0 0 / 0.5);
   }
-  /* Tap feedback for primary touch surfaces */
   .pressable {
     @apply transition-[transform,box-shadow,background-color] duration-150 ease-out;
   }
@@ -118,7 +121,6 @@
       transform: scale(0.982);
     }
   }
-  /* Entrance animation for page content */
   @media (prefers-reduced-motion: no-preference) {
     .rise-in {
       animation: rise-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -133,6 +135,81 @@
       opacity: 1;
       transform: translateY(0);
     }
+  }
+}
+
+/*
+ * Mobile is the default product surface. Desktop chrome and multi-column grids
+ * only appear when there is both enough width and a precise pointing device.
+ * This prevents mobile browsers using a desktop-sized layout viewport from
+ * receiving a shrunken desktop interface.
+ */
+.mobile-only-nav {
+  display: block;
+}
+
+.desktop-only-nav {
+  display: none;
+}
+
+.desktop-grid-2 {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.mobile-home-shell {
+  width: min(100%, 38rem);
+  margin-inline: auto;
+  padding: 1rem 1rem calc(7rem + env(safe-area-inset-bottom));
+}
+
+.mobile-hero-layout {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 1rem;
+}
+
+.mobile-sticky-actions {
+  position: sticky;
+  bottom: calc(5.25rem + env(safe-area-inset-bottom));
+  z-index: 20;
+  padding-top: 0.5rem;
+  padding-bottom: 0.25rem;
+  background: linear-gradient(to bottom, transparent, hsl(var(--background)) 28%);
+}
+
+@media (max-width: 390px) {
+  .mobile-home-shell {
+    padding-inline: 0.75rem;
+  }
+
+  .mobile-hero-layout {
+    gap: 0.75rem;
+  }
+}
+
+@media (min-width: 900px) and (hover: hover) and (pointer: fine) {
+  .mobile-only-nav {
+    display: none;
+  }
+
+  .desktop-only-nav {
+    display: block;
+  }
+
+  .desktop-grid-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mobile-home-shell {
+    width: min(100%, 52rem);
+    padding: 1.5rem 1.5rem 3rem;
+  }
+
+  .mobile-sticky-actions {
+    position: static;
+    padding: 0;
+    background: none;
   }
 }
 

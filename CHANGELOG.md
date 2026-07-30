@@ -2,6 +2,21 @@
 
 Notable application changes are recorded here. The application, SCIM schema and renderer profile are versioned independently.
 
+## 0.8.0 — 2026-07-30
+
+Mobile-first product redesign. SCIM schema remains 0.2 and the `scim-radial-1` renderer profile is unchanged.
+
+- Replaced breakpoint-only navigation with a coarse-pointer-aware mobile shell, so phones remain in the mobile interface even when a browser reports a desktop-sized layout viewport.
+- Reduced the mobile primary navigation from five cramped tabs to four task-oriented destinations: Home, Emergency, Map and More.
+- Rebuilt Home as a single-column touch interface with larger controls, clearer hierarchy, a compact resilience summary and progressive disclosure for each need.
+- Replaced the dense four-tier card grid with one focused wider-system workflow linking to Build and Matrix.
+- Added a sticky mobile action bar for reporting failures and opening the map.
+- Made the resilience ring size-configurable and reduced its mobile footprint.
+- Increased mobile spacing, safe-area padding and minimum touch-target sizes.
+- Refreshed the service-worker cache namespace and added `/build` to the offline application shell.
+
+Persistence keys, canonical semantics and AI disclosure boundaries are unchanged. The redesign changes presentation and navigation only; accepted SCIM documents remain compatible.
+
 ## 0.7.1 — 2026-07-29
 
 Hardening release. SCIM schema remains 0.2 and the `scim-radial-1` renderer profile is unchanged.

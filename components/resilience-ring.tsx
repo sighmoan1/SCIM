@@ -4,35 +4,41 @@ import { useEffect, useState } from "react";
 import { NEED_STATUS_META } from "@/components/need-status";
 import type { NeedAssessment } from "@/lib/scim/needs";
 
-const SIZE = 168;
-const STROKE = 13;
-const RADIUS = (SIZE - STROKE) / 2;
 const GAP_DEGREES = 7;
 const SEGMENT_DEGREES = 60 - GAP_DEGREES;
 
-function arcPath(startAngle: number, sweep: number): string {
+function arcPath(
+  startAngle: number,
+  sweep: number,
+  size: number,
+  radius: number
+): string {
   const start = ((startAngle - 90) * Math.PI) / 180;
   const end = ((startAngle + sweep - 90) * Math.PI) / 180;
-  const cx = SIZE / 2;
-  const cy = SIZE / 2;
-  const x1 = cx + RADIUS * Math.cos(start);
-  const y1 = cy + RADIUS * Math.sin(start);
-  const x2 = cx + RADIUS * Math.cos(end);
-  const y2 = cy + RADIUS * Math.sin(end);
-  return `M ${x1} ${y1} A ${RADIUS} ${RADIUS} 0 ${sweep > 180 ? 1 : 0} 1 ${x2} ${y2}`;
+  const cx = size / 2;
+  const cy = size / 2;
+  const x1 = cx + radius * Math.cos(start);
+  const y1 = cy + radius * Math.sin(start);
+  const x2 = cx + radius * Math.cos(end);
+  const y2 = cy + radius * Math.sin(end);
+  return `M ${x1} ${y1} A ${radius} ${radius} 0 ${sweep > 180 ? 1 : 0} 1 ${x2} ${y2}`;
 }
 
-/**
- * Six-segment status ring: one arc per need, mirroring the six sectors of the
- * SCIM radial map. Draws in on mount unless the user prefers reduced motion.
- */
-export function ResilienceRing({ needs }: { needs: NeedAssessment[] }) {
+export function ResilienceRing({
+  needs,
+  size = 168,
+}: {
+  needs: NeedAssessment[];
+  size?: number;
+}) {
   const [drawn, setDrawn] = useState(false);
   useEffect(() => {
     const frame = requestAnimationFrame(() => setDrawn(true));
     return () => cancelAnimationFrame(frame);
   }, []);
 
+  const stroke = Math.max(9, Math.round(size * 0.078));
+  const radius = (size - stroke) / 2;
   const okCount = needs.filter((need) => need.status === "protected").length;
   const worst = needs.some((need) => need.status === "unprotected")
     ? "unprotected"
@@ -42,33 +48,36 @@ export function ResilienceRing({ needs }: { needs: NeedAssessment[] }) {
         ? "unmapped"
         : "protected";
 
-  const arcLength = (SEGMENT_DEGREES / 360) * 2 * Math.PI * RADIUS;
+  const arcLength = (SEGMENT_DEGREES / 360) * 2 * Math.PI * radius;
+  const countClass = size <= 128 ? "text-3xl" : "text-4xl";
+  const denominatorClass = size <= 128 ? "text-base" : "text-xl";
 
   return (
-    <div className="relative" style={{ width: SIZE, height: SIZE }}>
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
       <svg
-        width={SIZE}
-        height={SIZE}
-        viewBox={`0 0 ${SIZE} ${SIZE}`}
+        width={size}
+        height={size}
+        viewBox={`0 0 ${size} ${size}`}
         role="img"
         aria-label={`${okCount} of 6 needs protected`}
       >
         {needs.map((need, index) => {
           const startAngle = index * 60 + GAP_DEGREES / 2;
           const meta = NEED_STATUS_META[need.status];
+          const path = arcPath(startAngle, SEGMENT_DEGREES, size, radius);
           return (
             <g key={need.threat.id}>
               <path
-                d={arcPath(startAngle, SEGMENT_DEGREES)}
+                d={path}
                 fill="none"
-                strokeWidth={STROKE}
+                strokeWidth={stroke}
                 strokeLinecap="round"
                 className="stroke-muted"
               />
               <path
-                d={arcPath(startAngle, SEGMENT_DEGREES)}
+                d={path}
                 fill="none"
-                strokeWidth={STROKE}
+                strokeWidth={stroke}
                 strokeLinecap="round"
                 stroke={meta.ring[0]}
                 strokeDasharray={arcLength}
@@ -77,9 +86,9 @@ export function ResilienceRing({ needs }: { needs: NeedAssessment[] }) {
                 style={{ "--delay": `${index * 70}ms` } as React.CSSProperties}
               />
               <path
-                d={arcPath(startAngle, SEGMENT_DEGREES)}
+                d={path}
                 fill="none"
-                strokeWidth={STROKE}
+                strokeWidth={stroke}
                 strokeLinecap="round"
                 stroke={meta.ring[1]}
                 strokeDasharray={arcLength}
@@ -92,12 +101,14 @@ export function ResilienceRing({ needs }: { needs: NeedAssessment[] }) {
         })}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-4xl font-bold tabular-nums tracking-tight">
+        <span className={`${countClass} font-bold tabular-nums tracking-tight`}>
           {okCount}
-          <span className="text-xl font-semibold text-muted-foreground">/6</span>
+          <span className={`${denominatorClass} font-semibold text-muted-foreground`}>
+            /6
+          </span>
         </span>
         <span
-          className={`text-xs font-semibold ${
+          className={`text-[11px] font-semibold ${
             worst === "protected"
               ? "text-ok"
               : worst === "at-risk"
