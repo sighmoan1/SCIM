@@ -1,4 +1,4 @@
-const CACHE_NAME = "scim-shell-v0.8.0";
+const CACHE_NAME = "scim-shell-v0.8.1";
 const SHELL_ROUTES = [
   "/",
   "/map",

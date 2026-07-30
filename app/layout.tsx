@@ -31,6 +31,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  maximumScale: 5,
   viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#f7fbfa" },
@@ -55,7 +56,7 @@ export default function RootLayout({
           <ServiceWorkerRegistration />
           <OfflineStatus />
           <AppNav />
-          <main className="pb-24 md:pb-6">{children}</main>
+          <main className="app-main">{children}</main>
         </ThemeProvider>
       </body>
     </html>

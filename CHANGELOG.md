@@ -2,6 +2,18 @@
 
 Notable application changes are recorded here. The application, SCIM schema and renderer profile are versioned independently.
 
+## 0.8.1 — 2026-07-30
+
+Mobile viewport correction. SCIM schema remains 0.2 and the `scim-radial-1` renderer profile is unchanged.
+
+- Removed the 38rem width cap from coarse-pointer Home layouts so Android browsers using a desktop-style layout viewport no longer centre a narrow, scaled-down column.
+- Added conservative coarse-pointer typography scaling when a phone reports an abnormally wide layout viewport.
+- Replaced breakpoint-based main-content bottom padding with pointer-aware safe-area spacing so the fixed mobile navigation does not cover other routes.
+- Kept ordinary `width=device-width` behaviour and user zoom support intact.
+- Refreshed the offline shell cache namespace.
+
+Persistence, canonical semantics, renderer behaviour and AI trust boundaries are unchanged.
+
 ## 0.8.0 — 2026-07-30
 
 Mobile-first product redesign. SCIM schema remains 0.2 and the `scim-radial-1` renderer profile is unchanged.
