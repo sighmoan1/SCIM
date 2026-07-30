@@ -2,6 +2,19 @@
 
 Notable application changes are recorded here. The application, SCIM schema and renderer profile are versioned independently.
 
+## 0.8.2 — 2026-07-30
+
+Readable scroll-led mobile layout. SCIM schema remains 0.2 and the `scim-radial-1` renderer profile is unchanged.
+
+- Increased the baseline type size on coarse-pointer devices instead of compressing the dashboard to fit above the fold.
+- Strongly compensated for Android desktop-style layout viewports so text remains physically readable.
+- Changed the Home hero to a vertical mobile composition and allowed the dashboard to scroll naturally.
+- Changed the primary Home actions to full-width stacked controls on mobile.
+- Added explicit document scrolling and overflow protection while retaining user zoom.
+- Increased bottom-navigation clearance and refreshed the offline shell cache namespace.
+
+Persistence, canonical semantics, renderer behaviour and AI trust boundaries are unchanged.
+
 ## 0.8.1 — 2026-07-30
 
 Mobile viewport correction. SCIM schema remains 0.2 and the `scim-radial-1` renderer profile is unchanged.

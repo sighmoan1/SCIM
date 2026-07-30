@@ -83,10 +83,15 @@
   html {
     -webkit-text-size-adjust: 100%;
     min-width: 320px;
+    min-height: 100%;
+    overflow-x: hidden;
   }
   body {
     @apply bg-background text-foreground antialiased;
     min-width: 320px;
+    min-height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     text-rendering: optimizeLegibility;
   }
@@ -139,8 +144,9 @@
 }
 
 /*
- * Mobile is the default product surface. Desktop chrome and multi-column grids
- * only appear when there is both enough width and a precise pointing device.
+ * Mobile is the default product surface. It is deliberately scroll-led: the
+ * interface uses readable type and touch-sized controls rather than shrinking
+ * the whole dashboard to fit above the fold.
  */
 .mobile-only-nav {
   display: block;
@@ -155,56 +161,62 @@
 }
 
 .app-main {
-  padding-bottom: calc(6.25rem + env(safe-area-inset-bottom));
+  padding-bottom: calc(7rem + env(safe-area-inset-bottom));
 }
 
 .mobile-home-shell {
   width: 100%;
   max-width: none;
   margin-inline: auto;
-  padding: 1rem 1rem calc(7rem + env(safe-area-inset-bottom));
+  padding: 1.25rem 1rem calc(8.5rem + env(safe-area-inset-bottom));
 }
 
 .mobile-hero-layout {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
   align-items: center;
-  gap: 1rem;
+  gap: 1.25rem;
+  text-align: center;
 }
 
 .mobile-sticky-actions {
-  position: sticky;
-  bottom: calc(5.25rem + env(safe-area-inset-bottom));
+  position: static;
+  grid-template-columns: minmax(0, 1fr) !important;
   z-index: 20;
-  padding-top: 0.5rem;
-  padding-bottom: 0.25rem;
-  background: linear-gradient(to bottom, transparent, hsl(var(--background)) 28%);
+  padding: 0;
+  background: none;
+}
+
+@media (pointer: coarse) {
+  html {
+    font-size: 18px;
+  }
 }
 
 @media (max-width: 390px) {
   .mobile-home-shell {
-    padding-inline: 0.75rem;
+    padding-inline: 0.85rem;
   }
 
   .mobile-hero-layout {
-    gap: 0.75rem;
+    gap: 1rem;
   }
 }
 
 /*
- * Some Android browsers can request a desktop-style layout viewport while the
- * device still has a coarse pointer. In that state viewport metadata may be
- * honoured imperfectly and ordinary mobile typography is visually scaled down.
- * Keep the mobile shell full-width and raise the rem baseline only as the
- * reported layout viewport becomes abnormally wide.
+ * Some Android browsers request a desktop-style layout viewport while the
+ * device still has a coarse pointer. Compensate strongly enough that the
+ * resulting physical type remains phone-readable; the page then scrolls
+ * naturally instead of compressing all content into one screen.
  */
 @media (pointer: coarse) and (min-width: 700px) {
   html {
-    font-size: clamp(16px, 1.85vw, 20px);
+    font-size: clamp(24px, 2.8vw, 28px);
   }
 
   .mobile-home-shell {
-    padding-inline: clamp(1rem, 3vw, 2rem);
+    padding-inline: clamp(1.25rem, 3vw, 2.25rem);
   }
 }
 
@@ -231,10 +243,15 @@
     padding: 1.5rem 1.5rem 3rem;
   }
 
+  .mobile-hero-layout {
+    grid-template-columns: auto minmax(0, 1fr);
+    justify-items: stretch;
+    gap: 1rem;
+    text-align: left;
+  }
+
   .mobile-sticky-actions {
-    position: static;
-    padding: 0;
-    background: none;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 }
 
