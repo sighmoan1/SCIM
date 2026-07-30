@@ -1,8 +1,9 @@
-const CACHE_NAME = "scim-shell-v0.7.1";
+const CACHE_NAME = "scim-shell-v0.8.0";
 const SHELL_ROUTES = [
   "/",
   "/map",
   "/matrix",
+  "/build",
   "/emergency",
   "/more",
   "/manifest.webmanifest",
